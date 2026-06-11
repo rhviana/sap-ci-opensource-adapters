@@ -1,0 +1,1717 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ComponentMetadata xmlns:gen="http://www.sap.hci.adk.com/gen" xmlns:bp="http://www.adk.gen/xmlns/blueprint" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" ComponentId="ctype::Adapter/cname::EventSmartKafka/vendor::rhviana/version::1.0.0" ComponentName="EventSmartKafka" UIElementType="Adapter" IsExtension="false" IsFinal="true" IsPreserves="true" IsDefaultGenerator="true" ComponentDisplayName="EventSmartKafka">
+    <Variant VariantName="EventSmartKafka Consumer" VariantId="ctype::AdapterVariant/cname::EventSmartKafka/vendor::rhviana/tp::TCP/mp::Kafka/direction::Sender" MetadataVersion="2.0" gen:RuntimeComponentBaseUri="eventsmartkafka" AttachmentBehavior="Preserve">
+        <InputContent Cardinality="1" Scope="outsidepool" MessageCardinality="1" isStreaming="false">
+            <Content>
+                <ContentType>Any</ContentType>
+                <Schema xsi:type="xs:string"/>
+            </Content>
+        </InputContent>
+        <OutputContent Cardinality="1" Scope="outsidepool" MessageCardinality="1" isStreaming="false">
+            <Content>
+                <ContentType>Any</ContentType>
+                <Schema xsi:type="xs:string"/>
+            </Content>
+        </OutputContent>
+        <Tab id="connection">
+            <GuiLabels guid="14cf3e79-3a08-40e2-8bf6-a744e0f0e07e">
+                <Label language="EN">Connection</Label>
+            </GuiLabels>
+            <AttributeGroup id="senderHostDetails">
+                <Name xsi:type="xs:string">Host Details</Name>
+                <GuiLabels guid="6e8f13a1-8b80-44be-b685-d090b44a2963">
+                    <Label language="EN">Kafka Cluster Bootstrap Hosts Detail:</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>kafkaClusterHostsTable</ReferenceName>
+                    <description>Define one or more Kafka bootstrap broker hosts and ports. Use the broker address provided by Confluent, Redpanda, Aiven, IBM Event Streams or your Kafka administrator.</description>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="senderConnectivityDetails">
+                <Name xsi:type="xs:string">Connectivity</Name>
+                <GuiLabels guid="5f2a1c3d-9b4e-4a21-8c6f-1d2e3f4a5b6c">
+                    <Label language="EN">Connectivity - On-Prem | On-Cloud</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>proxyType</ReferenceName>
+                    <description>Select Internet for public Kafka endpoints or On-Premise when routing through SAP Cloud Connector.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>sapSapccLocationId</ReferenceName>
+                    <description>SAP Cloud Connector Location ID. Required only when Proxy Type is On-Premise and the Cloud Connector uses a Location ID.</description>
+                    <EditCondition>
+                        <AttributeName>proxyType</AttributeName>
+                        <AttributeValue>On-Premise</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="senderAuthenticationDetails">
+                <Name xsi:type="xs:string">Authentication Details</Name>
+                <GuiLabels guid="753b5a11-d78b-453c-994a-14d413803ba5">
+                    <Label language="EN">Authentication Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>authentication</ReferenceName>
+                    <description>Select the Kafka authentication profile. SASL supports SASL_SSL when TLS is enabled and SASL_PLAINTEXT when TLS is disabled. Client Certificate is for mTLS. OAuth is for OAuth-based Kafka providers.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>connectWithTls</ReferenceName>
+                    <description>Enable TLS/SSL encryption for the broker connection. ON = SASL_SSL for SASL. OFF = SASL_PLAINTEXT for SASL without TLS; credential alias is still required.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>saslMechanism</ReferenceName>
+                    <description>SASL mechanism used by the broker. PLAIN is common for Confluent Cloud; SCRAM depends on broker configuration.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>credentialAlias</ReferenceName>
+                    <description>Security Material alias containing Kafka username/password or secure parameters required by the selected authentication profile.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>brokerCaSource</ReferenceName>
+                    <description>Controls whether the adapter uses the JVM trust store or a custom broker CA/certificate alias.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>authentication</AttributeName>
+                            <AttributeValue>SASL</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>authentication</AttributeName>
+                            <AttributeValue>Client Certificate</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>certificateAlias</ReferenceName>
+                    <description>Security Material alias for the custom broker CA certificate when Broker CA Source is Custom.</description>
+                    <EditCondition>
+                        <AttributeName>brokerCaSource</AttributeName>
+                        <AttributeValue>Custom</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>mtlsKeyAlias</ReferenceName>
+                    <description>Security Material key pair alias used for client certificate authentication/mTLS.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>Client Certificate</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthTokenEndpoint</ReferenceName>
+                    <description>OAuth token endpoint used to obtain access tokens for OAuth-based Kafka authentication.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthClientId</ReferenceName>
+                    <description>OAuth client ID assigned by the Kafka provider or identity provider.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthClientSecretAlias</ReferenceName>
+                    <description>Security Material alias containing the OAuth client secret.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthScope</ReferenceName>
+                    <description>Optional OAuth scope required by the token endpoint. Leave empty if the provider does not require a scope.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="processing">
+            <GuiLabels guid="760eed88-fb8b-41e1-8c59-163d7c4ccc85">
+                <Label language="EN">Processing</Label>
+            </GuiLabels>
+            <AttributeGroup id="senderProcessingDetails">
+                <Name xsi:type="xs:string">Processing Details</Name>
+                <GuiLabels guid="99392f86-3704-499f-b086-167b8b24074b">
+                    <Label language="EN">Processing Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>topicPattern</ReferenceName>
+                    <description>Kafka topic name, comma-separated topic list, or supported topic pattern depending on the adapter mode. Example: acme.br.sales.order.created.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>groupId</ReferenceName>
+                    <description>Kafka consumer group ID used to store committed offsets. Keep stable for normal consumption. Use a new group only for isolated replay tests.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>partitions</ReferenceName>
+                    <description>Optional comma-separated partition list. Leave empty to let Kafka assign partitions automatically. Example: 0,1,2.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>parallelConsumers</ReferenceName>
+                    <description>Number of consumer instances created by the adapter. Effective parallelism is limited by the number of topic partitions.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>autoOffsetReset</ReferenceName>
+                    <description>Kafka reset policy used only when the group has no committed offset. Existing committed offsets take precedence over earliest/latest/none.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>errorHandling</ReferenceName>
+                    <description>Runtime policy for failed records. Skip commits the failed offset and continues. Stop does not commit and halts. Retry does not commit and retries according to retry settings.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>retryAttempts</ReferenceName>
+                    <description>Number of pipeline retry attempts for Retry Failed Message. The failed Kafka offset is not committed until processing succeeds.</description>
+                    <EditCondition>
+                        <AttributeName>errorHandling</AttributeName>
+                        <AttributeValue>Retry Failed Message</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="senderFetchDetails">
+                <Name xsi:type="xs:string">Fetch Details</Name>
+                <GuiLabels guid="1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d">
+                    <Label language="EN">Fetch Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>minFetchSize</ReferenceName>
+                    <description>Minimum fetch size in MB. Use 0 for immediate polling. Higher values may wait for more data before returning records.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>maxFetchSize</ReferenceName>
+                    <description>Maximum fetch size in MB. Must be larger than the largest record you want Kafka to deliver to the adapter before conversion limits are applied.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>maxPollRecords</ReferenceName>
+                    <description>Maximum number of Kafka records returned per poll. Use 1 for deterministic troubleshooting; use higher values for batch consumption.</description>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="messageRecovery">
+            <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9001">
+                <Label language="EN">Message Recovery</Label>
+            </GuiLabels>
+            <AttributeGroup id="senderMessageRecoveryDetails">
+                <Name xsi:type="xs:string">Message Recovery</Name>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9002">
+                    <Label language="EN">Message Recovery</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>recoveryMode</ReferenceName>
+                    <description>Disabled for normal consumption. Seek by Timestamp for controlled replay/recovery using the topic, partition and group ID configured in Processing.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>recoveryTimestampFormat</ReferenceName>
+                    <description>Format of the recovery timestamp. Auto Detect accepts ISO-8601 UTC from Confluent, Unix epoch milliseconds, or Unix epoch seconds.</description>
+                    <EditCondition>
+                        <AttributeName>recoveryMode</AttributeName>
+                        <AttributeValue>Seek by Timestamp</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>recoveryTimestampValue</ReferenceName>
+                    <description>Timestamp used for recovery. Examples: 2026-06-07T14:19:07.121Z, 1780841947121, or 1780841947.</description>
+                    <EditCondition>
+                        <AttributeName>recoveryMode</AttributeName>
+                        <AttributeValue>Seek by Timestamp</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>recoveryReadMode</ReferenceName>
+                    <description>Read only first matched message stops after the first record resolved by the timestamp. Continue from timestamp replays from that point forward.</description>
+                    <EditCondition>
+                        <AttributeName>recoveryMode</AttributeName>
+                        <AttributeValue>Seek by Timestamp</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="conversion">
+            <GuiLabels guid="a4effcf2-da01-42b8-94dd-6551e904f746">
+                <Label language="EN">Conversion</Label>
+            </GuiLabels>
+            <AttributeGroup id="senderMessageConversionDetails">
+                <Name xsi:type="xs:string">Message Conversion</Name>
+                <GuiLabels guid="a0bca3ea-1da2-48b0-8df2-746006c2e021">
+                    <Label language="EN">Message Conversion</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>conversionFormat</ReferenceName>
+                    <description>Select payload conversion mode. None passes raw bytes. JSON/XML convert Avro payloads using Schema Registry settings.</description>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="senderSchemaRegistryDetails">
+                <Name xsi:type="xs:string">Schema Registry Settings</Name>
+                <GuiLabels guid="b0bca3ea-2da2-48b0-8df2-746006c2e022">
+                    <Label language="EN">Schema Registry Settings</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>schemaRegistryHostAddress</ReferenceName>
+                    <description>Schema Registry base URL used for Avro conversion. Example: https://psrc-xxxxx.us-east-2.aws.confluent.cloud.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaRegistryCredentialAlias</ReferenceName>
+                    <description>Security Material alias containing Schema Registry credentials.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaIdResolutionMode</ReferenceName>
+                    <description>Magic Byte reads the schema ID from Confluent wire format. Fixed Schema ID forces a configured schema ID.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaRegistrySchemaId</ReferenceName>
+                    <description>Fixed Schema Registry ID used only when Schema ID Source is Fixed Schema ID.</description>
+                    <AndCondition>
+                        <OrCondition>
+                            <EditCondition>
+                                <AttributeName>conversionFormat</AttributeName>
+                                <AttributeValue>JSON</AttributeValue>
+                            </EditCondition>
+                            <EditCondition>
+                                <AttributeName>conversionFormat</AttributeName>
+                                <AttributeValue>XML</AttributeValue>
+                            </EditCondition>
+                        </OrCondition>
+                        <EditCondition>
+                            <AttributeName>schemaIdResolutionMode</AttributeName>
+                            <AttributeValue>Fixed Schema ID</AttributeValue>
+                        </EditCondition>
+                    </AndCondition>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="senderMaxSizePayloadConversionDetails">
+                <Name xsi:type="xs:string">Max Size Payload Conversion</Name>
+                <GuiLabels guid="e4d5c6b7-a890-4f12-bc34-de5678901235">
+                    <Label language="EN">Max Size Payload Conversion</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>maxPayloadConversionSize</ReferenceName>
+                    <description>Maximum payload size accepted for conversion, in MB. Kafka may fetch larger records, but conversion fails if this limit is exceeded.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaIdBufferSize</ReferenceName>
+                    <description>Number of bytes inspected at the beginning of the payload for schema/magic-byte diagnostics.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="advanced">
+            <GuiLabels guid="251c89c2-2b1e-428c-b57e-83106e449931">
+                <Label language="EN">Advanced</Label>
+            </GuiLabels>
+            <AttributeGroup id="senderTimeoutDetails">
+                <Name xsi:type="xs:string">Timeout Details</Name>
+                <GuiLabels guid="2b3c4d5e-6f7a-8b9c-0d1e-2e3f4a5b6c7d">
+                    <Label language="EN">Timeout Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>requestTimeoutS</ReferenceName>
+                    <description>Maximum time in seconds for broker/client request operations before timeout.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>maxRetryBackoffMs</ReferenceName>
+                    <description>Maximum Kafka client reconnect/retry backoff in milliseconds.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>reconnectDelayS</ReferenceName>
+                    <description>Delay in seconds before retrying broker initialization after retryable startup failures.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>sessionTimeoutS</ReferenceName>
+                    <description>Kafka consumer session timeout in seconds. Lower values detect dead consumers faster, but too low can cause rebalances.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>maxPollIntervalMs</ReferenceName>
+                    <description>Maximum interval between poll calls. Keep lower than Kafka default to avoid long zombie-like rebalance waits in CPI tests.</description>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+    </Variant>
+    <Variant VariantName="EventSmartKafka Producer" VariantId="ctype::AdapterVariant/cname::EventSmartKafka/vendor::rhviana/tp::TCP/mp::Kafka/direction::Receiver" IsRequestResponse="true" MetadataVersion="2.0" gen:RuntimeComponentBaseUri="eventsmartkafka" AttachmentBehavior="Preserve">
+        <InputContent Cardinality="1" Scope="outsidepool" MessageCardinality="1" isStreaming="false">
+            <Content>
+                <ContentType>Any</ContentType>
+                <Schema xsi:type="xs:string"/>
+            </Content>
+        </InputContent>
+        <OutputContent Cardinality="1" Scope="outsidepool" MessageCardinality="1" isStreaming="false">
+            <Content>
+                <ContentType>Any</ContentType>
+                <Schema xsi:type="xs:string"/>
+            </Content>
+        </OutputContent>
+        <Tab id="connection">
+            <GuiLabels guid="ef2cc6ab-faac-4e37-8e85-e9aaec919f97">
+                <Label language="EN">Connection</Label>
+            </GuiLabels>
+            <AttributeGroup id="receiverHostDetails">
+                <Name xsi:type="xs:string">Host Details</Name>
+                <GuiLabels guid="eb9a4e7f-d309-41b1-a699-e707a0fdc36d">
+                    <Label language="EN">Kafka Cluster Bootstrap Hosts Detail:</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>kafkaClusterHostsTable</ReferenceName>
+                    <description>Define one or more Kafka bootstrap broker hosts and ports. Use the broker address provided by Confluent, Redpanda, Aiven, IBM Event Streams or your Kafka administrator.</description>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="receiverConnectivityDetails">
+                <Name xsi:type="xs:string">Connectivity</Name>
+                <GuiLabels guid="6a3b2d4e-0c5f-4b32-9d7a-2e3f4a5b6c7d">
+                    <Label language="EN">Connectivity</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>proxyType</ReferenceName>
+                    <description>Select Internet for public Kafka endpoints or On-Premise when routing through SAP Cloud Connector.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>sapSapccLocationId</ReferenceName>
+                    <description>SAP Cloud Connector Location ID. Required only when Proxy Type is On-Premise and the Cloud Connector uses a Location ID.</description>
+                    <EditCondition>
+                        <AttributeName>proxyType</AttributeName>
+                        <AttributeValue>On-Premise</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="receiverAuthenticationDetails">
+                <Name xsi:type="xs:string">Authentication Details</Name>
+                <GuiLabels guid="994ed885-34f1-4717-8029-ed6a1390369d">
+                    <Label language="EN">Authentication Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>authentication</ReferenceName>
+                    <description>Select the Kafka authentication profile. SASL supports SASL_SSL when TLS is enabled and SASL_PLAINTEXT when TLS is disabled. Client Certificate is for mTLS. OAuth is for OAuth-based Kafka providers.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>connectWithTls</ReferenceName>
+                    <description>Enable TLS/SSL encryption for the broker connection. ON = SASL_SSL for SASL. OFF = SASL_PLAINTEXT for SASL without TLS; credential alias is still required.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>saslMechanism</ReferenceName>
+                    <description>SASL mechanism used by the broker. PLAIN is common for Confluent Cloud; SCRAM depends on broker configuration.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>credentialAlias</ReferenceName>
+                    <description>Security Material alias containing Kafka username/password or secure parameters required by the selected authentication profile.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>brokerCaSource</ReferenceName>
+                    <description>Controls whether the adapter uses the JVM trust store or a custom broker CA/certificate alias.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>authentication</AttributeName>
+                            <AttributeValue>SASL</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>authentication</AttributeName>
+                            <AttributeValue>Client Certificate</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>certificateAlias</ReferenceName>
+                    <description>Security Material alias for the custom broker CA certificate when Broker CA Source is Custom.</description>
+                    <EditCondition>
+                        <AttributeName>brokerCaSource</AttributeName>
+                        <AttributeValue>Custom</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>mtlsKeyAlias</ReferenceName>
+                    <description>Security Material key pair alias used for client certificate authentication/mTLS.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>Client Certificate</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthTokenEndpoint</ReferenceName>
+                    <description>OAuth token endpoint used to obtain access tokens for OAuth-based Kafka authentication.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthClientId</ReferenceName>
+                    <description>OAuth client ID assigned by the Kafka provider or identity provider.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthClientSecretAlias</ReferenceName>
+                    <description>Security Material alias containing the OAuth client secret.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>oauthScope</ReferenceName>
+                    <description>Optional OAuth scope required by the token endpoint. Leave empty if the provider does not require a scope.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>OAuth</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="processing">
+            <GuiLabels guid="980e633c-35a8-4498-a89c-fd788daf92e9">
+                <Label language="EN">Processing</Label>
+            </GuiLabels>
+            <AttributeGroup id="receiverProcessingDetails">
+                <Name xsi:type="xs:string">Processing Details</Name>
+                <GuiLabels guid="68b6d1e8-1f65-480b-afc2-8b348d7bbde6">
+                    <Label language="EN">Processing Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>targetTopic</ReferenceName>
+                    <description>Kafka target topic used by the producer variant.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>keyHeaderName</ReferenceName>
+                    <description>Optional exchange header name whose value is used as Kafka record key by the producer variant.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>acks</ReferenceName>
+                    <description>Producer acknowledgment level. all gives strongest delivery confirmation; 1 waits for leader only; 0 does not wait for broker acknowledgment.</description>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="conversion">
+            <GuiLabels guid="4f2c2761-5f24-4ea8-b72a-01765fb537e1">
+                <Label language="EN">Conversion</Label>
+            </GuiLabels>
+            <AttributeGroup id="receiverConversionDetails">
+                <Name xsi:type="xs:string">Avro Conversion Options</Name>
+                <GuiLabels guid="3b25fd5b-ddef-4c30-afa6-25cd6e0cb151">
+                    <Label language="EN">Avro Conversion Options</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>conversionFormat</ReferenceName>
+                    <description>Select payload conversion mode. None passes raw bytes. JSON/XML convert Avro payloads using Schema Registry settings.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaIdResolutionMode</ReferenceName>
+                    <description>Magic Byte reads the schema ID from Confluent wire format. Fixed Schema ID forces a configured schema ID.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+            </AttributeGroup>
+            <AttributeGroup id="receiverSchemaRegistryDetails">
+                <Name xsi:type="xs:string">Schema Registry Settings</Name>
+                <GuiLabels guid="3b25fd5b-ddef-4c30-afa6-25cd6e0cb152">
+                    <Label language="EN">Schema Registry Settings</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>schemaRegistryHostAddress</ReferenceName>
+                    <description>Schema Registry base URL used for Avro conversion. Example: https://psrc-xxxxx.us-east-2.aws.confluent.cloud.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaRegistryCredentialAlias</ReferenceName>
+                    <description>Security Material alias containing Schema Registry credentials.</description>
+                    <OrCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>JSON</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>conversionFormat</AttributeName>
+                            <AttributeValue>XML</AttributeValue>
+                        </EditCondition>
+                    </OrCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaRegistrySchemaId</ReferenceName>
+                    <description>Fixed Schema Registry ID used only when Schema ID Source is Fixed Schema ID.</description>
+                    <AndCondition>
+                        <OrCondition>
+                            <EditCondition>
+                                <AttributeName>conversionFormat</AttributeName>
+                                <AttributeValue>JSON</AttributeValue>
+                            </EditCondition>
+                            <EditCondition>
+                                <AttributeName>conversionFormat</AttributeName>
+                                <AttributeValue>XML</AttributeValue>
+                            </EditCondition>
+                        </OrCondition>
+                        <EditCondition>
+                            <AttributeName>schemaIdResolutionMode</AttributeName>
+                            <AttributeValue>Fixed Schema ID</AttributeValue>
+                        </EditCondition>
+                    </AndCondition>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="conversionAdvanced">
+            <GuiLabels guid="a2b3c4d5-e6f7-8a9b-0c1d-2e3f4a5b6c7d">
+                <Label language="EN">Conversion Advanced</Label>
+            </GuiLabels>
+            <AttributeGroup id="receiverConversionAdvancedDetails">
+                <Name xsi:type="xs:string">Governance and Volumetry</Name>
+                <GuiLabels guid="b5c6d7e8-f9a0-1b2c-3d4e-5f6a7b8c9d0e">
+                    <Label language="EN">Governance and Volumetry</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>maxPayloadConversionSize</ReferenceName>
+                    <description>Maximum payload size accepted for conversion, in MB. Kafka may fetch larger records, but conversion fails if this limit is exceeded.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>schemaIdBufferSize</ReferenceName>
+                    <description>Number of bytes inspected at the beginning of the payload for schema/magic-byte diagnostics.</description>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+        <Tab id="advanced">
+            <GuiLabels guid="88e73d0e-a9ba-454d-bea5-8c14b35efd2b">
+                <Label language="EN">Advanced</Label>
+            </GuiLabels>
+            <AttributeGroup id="receiverRuntimeDetails">
+                <Name xsi:type="xs:string">Runtime Details</Name>
+                <GuiLabels guid="cb404aad-9aad-4cb1-bfcb-550f8d657ae7">
+                    <Label language="EN">Runtime Details</Label>
+                </GuiLabels>
+            </AttributeGroup>
+            <AttributeGroup id="receiverTimeoutDetails">
+                <Name xsi:type="xs:string">Timeout Details</Name>
+                <GuiLabels guid="3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f">
+                    <Label language="EN">Timeout Details</Label>
+                </GuiLabels>
+                <AttributeReference>
+                    <ReferenceName>requestTimeoutS</ReferenceName>
+                    <description>Maximum time in seconds for broker/client request operations before timeout.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>deliveryTimeoutS</ReferenceName>
+                    <description>Producer delivery timeout in seconds.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>maxRetryBackoffMs</ReferenceName>
+                    <description>Maximum Kafka client reconnect/retry backoff in milliseconds.</description>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>reconnectDelayS</ReferenceName>
+                    <description>Delay in seconds before retrying broker initialization after retryable startup failures.</description>
+                </AttributeReference>
+            </AttributeGroup>
+        </Tab>
+    </Variant>
+    <AttributeTableMetadata>
+        <Name>kafkaClusterHostsTable</Name>
+        <Usage>true</Usage>
+        <GuiLabels guid="0175e1be-4b21-4b7d-b660-62b6a8005e40">
+            <Label language="EN"> </Label>
+        </GuiLabels>
+        <AttributeReference>
+            <ReferenceName>kafkaHostRow</ReferenceName>
+            <description>Kafka bootstrap broker host name. Do not include protocol. Example: pkc-xxxxx.us-east-2.aws.confluent.cloud.</description>
+        </AttributeReference>
+        <AttributeReference>
+            <ReferenceName>kafkaPortRow</ReferenceName>
+            <description>Kafka bootstrap broker port. Common secure Kafka port is 9092.</description>
+        </AttributeReference>
+    </AttributeTableMetadata>
+    <AttributeMetadata>
+        <Name>kafkaHostRow</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="0275e1be-4b21-4b7d-b660-62b6a8005e41">
+            <Label language="EN">Host (e.g. brokerhost or IP):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>kafkaPortRow</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>9092</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="0375e1be-4b21-4b7d-b660-62b6a8005e42">
+            <Label language="EN">Port</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>proxyType</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>Internet</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="c427c59c-8542-4ee8-abe0-125cb6850771">
+            <Label language="EN">Proxy Type</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>Internet</Value>
+                <GuiLabels guid="c427c59c-8542-4ee8-abe0-125cb6850772">
+                    <Label language="EN">📡 Internet</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>On-Premise</Value>
+                <GuiLabels guid="c427c59c-8542-4ee8-abe0-125cb6850773">
+                    <Label language="EN">🧱 On-Premise</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>sapSapccLocationId</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a54761b6-9842-4be8-abe0-725cb6850780">
+            <Label language="EN">Cloud Connector Location ID:</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>authentication</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>SASL</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="80be509a-9548-4e81-8a0f-b72e0352835c">
+            <Label language="EN">Authentication</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>None</Value>
+                <GuiLabels guid="b31fdcdb-d366-4415-a0a2-62413d87bc90">
+                    <Label language="EN">🌐 NONE | Plain Text</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>SASL</Value>
+                <GuiLabels guid="a12fdcdb-d366-4415-a0a2-62413d87bc94">
+                    <Label language="EN">🔐 SASL (Basic / TLS optional)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>connectWithTls</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:boolean</DataType>
+        <Default>true</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="da44f081-b91c-466f-9914-bb0b560efb5d">
+            <Label language="EN">Connect with TLS</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>saslMechanism</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>PLAIN</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="504265c1-8e77-4492-bc5c-c67a8c10f492">
+            <Label language="EN">SASL Mechanism</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>PLAIN</Value>
+                <GuiLabels guid="adb88b6a-1acc-49e5-9cfa-47a865626e74">
+                    <Label language="EN">📄 PLAIN</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>SCRAM-SHA-256</Value>
+                <GuiLabels guid="8a3623f2-0f53-4702-98d7-95cc9c01cfac">
+                    <Label language="EN">🔐 SCRAM-SHA-256</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>SCRAM-SHA-512</Value>
+                <GuiLabels guid="92db848f-7696-4cd0-9946-d896b871cd77">
+                    <Label language="EN">🔐 SCRAM-SHA-512</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>credentialAlias</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="9bdfa152-bce5-4bb1-abb0-64be228dea16">
+            <Label language="EN">Credential Name</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>certificateAlias</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="37c257c5-1ff1-4117-a81d-3c746a5f3d26">
+            <Label language="EN">CA Certificate (Keystore alias)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>brokerCaSource</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>None</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="b1c2d3e4-f5a6-47b8-9c0d-1e2f3a4b5c60">
+            <Label language="EN">Broker CA</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>None</Value>
+                <GuiLabels guid="b1c2d3e4-f5a6-47b8-9c0d-1e2f3a4b5c61">
+                    <Label language="EN">🌍 NONE- System public CA</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Custom</Value>
+                <GuiLabels guid="b1c2d3e4-f5a6-47b8-9c0d-1e2f3a4b5c62">
+                    <Label language="EN">🏢 Custom - System private CA  from Keystore</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>topicPattern</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="50b9ffc9-52e8-4ab9-a9ff-98cbcc5704fe">
+            <Label language="EN">Topic(s) / Pattern(s):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>groupId</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="9c4af73b-45f0-4cbb-a3a9-4a2d0ce2d901">
+            <Label language="EN">Group ID (optional)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>partitions</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="b1a2c3d4-e5f6-7890-abcd-ef1234567890">
+            <Label language="EN">Partitions:</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>parallelConsumers</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>1</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="886f0a6d-1333-4385-bc69-4f420221a6a2">
+            <Label language="EN">Parallel Consumers</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>errorHandling</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>Stop on Error</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="c92f48ba-d31e-4bad-a156-7d46a71446c5">
+            <Label language="EN">Error Handling</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>Stop on Error</Value>
+                <GuiLabels guid="cf6797b5-d935-4e82-8831-83406fb09bb0">
+                    <Label language="EN">❌ Stop on Error</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Retry Failed Message</Value>
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc0664">
+                    <Label language="EN">🔁 Retry Failed Message</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Skip Failed Message</Value>
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc0663">
+                    <Label language="EN">⏭️ Skip Failed Message</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>retryAttempts</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>5</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469">
+            <Label language="EN">Retry Attempts</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>5</Value>
+                <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469a">
+                    <Label language="EN">5 (default)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>6</Value>
+                <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469b">
+                    <Label language="EN">6</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>7</Value>
+                <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469c">
+                    <Label language="EN">7</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>8</Value>
+                <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469d">
+                    <Label language="EN">8</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>9</Value>
+                <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469e">
+                    <Label language="EN">9</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>10</Value>
+                <GuiLabels guid="f92f48ba-d31e-4bad-a156-7d46a714469f">
+                    <Label language="EN">10 (maximum)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>minFetchSize</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>0</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114001">
+            <Label language="EN">Min. Fetch Size (in MB, 0 = Immediate):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxFetchSize</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>5</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114002">
+            <Label language="EN">Max. Fetch Size (in MB):</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>5</Value>
+                <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114012">
+                    <Label language="EN">5 MB</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>10</Value>
+                <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114013">
+                    <Label language="EN">10 MB</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>20</Value>
+                <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114014">
+                    <Label language="EN">20 MB MAX</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxPartitionFetchSize</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>1048576</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114003">
+            <Label language="EN">Max. Partition Fetch Size (derived internally)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxFetchWaitTime</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>500</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="3c2f5a8e-71bd-4911-8da1-36f71d114004">
+            <Label language="EN">Max. Fetch Wait Time (hidden runtime default)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxPollRecords</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>500</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9a8">
+            <Label language="EN">Max. Number of Polled Records:</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>requestTimeoutS</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>30</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9b5">
+            <Label language="EN">Request Timeout (in s):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxRetryBackoffMs</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>1000</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="4d5e6f7a-8b9c-0d1e-2e3f-4a5b6c7d8e9f">
+            <Label language="EN">Max. Retry Backoff (in ms):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>reconnectDelayS</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>1</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b">
+            <Label language="EN">Reconnect Delay (in s):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>heartbeatIntervalS</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>3</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="6e7f8a9b-0c1d-2e3f-4a5b-6c7d8e9f0a1b">
+            <Label language="EN">Heartbeat Interval (in s):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>sessionTimeoutS</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>10</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c">
+            <Label language="EN">Session Timeout (in s):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxPollIntervalMs</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>60000</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="8a9b0c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d">
+            <Label language="EN">Max. Poll Interval (in ms):</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>producerRegistryProfile</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>CONFLUENT_CLOUD</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="8c7d0c69-31bb-4b4a-8db5-d8f33f220002">
+            <Label language="EN">Producer / Registry Profile</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>CONFLUENT_CLOUD</Value>
+                <GuiLabels guid="8c7d0c69-31bb-4b4a-8db5-d8f33f220003">
+                    <Label language="EN">☁️ Confluent Cloud</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>AIVEN_KARAPACE</Value>
+                <GuiLabels guid="8c7d0c69-31bb-4b4a-8db5-d8f33f220004">
+                    <Label language="EN">🦀 Aiven / Karapace</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>REDPANDA</Value>
+                <GuiLabels guid="8c7d0c69-31bb-4b4a-8db5-d8f33f220005">
+                    <Label language="EN">🐼 Redpanda</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>IBM_EVENT_STREAMS</Value>
+                <GuiLabels guid="8c7d0c69-31bb-4b4a-8db5-d8f33f220006">
+                    <Label language="EN">🧬 IBM Event Streams</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>CUSTOM_CONFLUENT_COMPATIBLE</Value>
+                <GuiLabels guid="8c7d0c69-31bb-4b4a-8db5-d8f33f220007">
+                    <Label language="EN">🪄 Custom Confluent-compatible</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>maxPayloadConversionSize</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>1</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b05">
+            <Label language="EN">Max Payload Conversion Size</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>1</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b15">
+                    <Label language="EN">📦 1 MB (Recommended)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>3</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b20">
+                    <Label language="EN">💿 3 MB (Safe)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>5</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b25">
+                    <Label language="EN">🐘 5 MB (Max Limit)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>schemaIdBufferSize</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>50</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b06">
+            <Label language="EN">Max Schema Size (Registry Cache)</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>50</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b16">
+                    <Label language="EN">🤏 50 KB (Recommended)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>75</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b18">
+                    <Label language="EN">📐 75 KB (Large schemas)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>100</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b26">
+                    <Label language="EN">⚖️ 100 KB (Maximum)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>pollTimeoutS</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:long</DataType>
+        <Default>1</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="d8ade019-f78f-4ec4-ac9e-5632e43683d6">
+            <Label language="EN">Poll Timeout seconds</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>autoOffsetReset</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>latest</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="c92f48ba-d31e-4bad-a156-7d46a71446fa">
+            <Label language="EN">Auto Offset Reset</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>latest</Value>
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc06fa">
+                    <Label language="EN">🔝Latest</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>earliest</Value>
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc06fb">
+                    <Label language="EN">🕰️ Earliest</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>none</Value>
+                <GuiLabels guid="cf6797b5-d935-4e82-8831-83406fb09bfa">
+                    <Label language="EN">⚪ None</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>initialDelayS</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>0</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9b1">
+            <Label language="EN">Initial Delay (seconds)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>delayS</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>0</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9b2">
+            <Label language="EN">Delay (seconds)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>targetTopic</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9b3">
+            <Label language="EN">Target Topic</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>keyHeaderName</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9b4">
+            <Label language="EN">Kafka Record Key Header Name</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>acks</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>all</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="c92f48ba-d31e-4bad-a156-7d46a71446fb">
+            <Label language="EN">Acks (Acknowledgment)</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>all</Value>
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc06fc">
+                    <Label language="EN">all (-1)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>1</Value>
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc06fd">
+                    <Label language="EN">1 (leader only)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>0</Value>
+                <GuiLabels guid="cf6797b5-d935-4e82-8831-83406fb09bfc">
+                    <Label language="EN">0 (no ack)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>deliveryTimeoutS</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:integer</DataType>
+        <Default>120</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9b6">
+            <Label language="EN">Delivery Timeout (seconds)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>recoveryMode</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>Disabled</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9010">
+            <Label language="EN">Message Recovery</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>Disabled</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9011">
+                    <Label language="EN">Disabled</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Seek by Timestamp</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9012">
+                    <Label language="EN">Seek by Timestamp</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>recoveryTimestampFormat</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>Auto Detect</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9020">
+            <Label language="EN">Timestamp Format</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>Auto Detect</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9021">
+                    <Label language="EN">Auto Detect</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>ISO-8601 UTC</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9022">
+                    <Label language="EN">ISO-8601 UTC</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Unix Epoch milliseconds</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9023">
+                    <Label language="EN">Unix Epoch ms</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Unix Epoch seconds</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9024">
+                    <Label language="EN">Unix Epoch s</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>recoveryTimestampValue</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length>80</Length>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9030">
+            <Label language="EN">Timestamp Value - ISO-8601 UTC or Unix Epoch</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>recoveryReadMode</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>Read only first matched message</Default>
+        <Length></Length>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9040">
+            <Label language="EN">Recovery Read Mode</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>Read only first matched message</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9041">
+                    <Label language="EN">Read only first matched message</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Continue from timestamp</Value>
+                <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9042">
+                    <Label language="EN">Continue from timestamp</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>seekToTimestamp</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-7890-abcd-ef1234567801">
+            <Label language="EN">Seek to Timestamp (Unix ms, optional)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>oauthTokenEndpoint</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-7890-abcd-ef1234567803">
+            <Label language="EN">OAuth Token Endpoint URL</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>oauthClientId</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-7890-abcd-ef1234567804">
+            <Label language="EN">OAuth Client ID</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>oauthClientSecretAlias</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-7890-abcd-ef1234567805">
+            <Label language="EN">OAuth Client Secret Alias</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>oauthScope</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-7890-abcd-ef1234567806">
+            <Label language="EN">OAuth Scope (optional)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>mtlsKeyAlias</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-7890-abcd-ef1234567807">
+            <Label language="EN">📜 mTLS Client Key Alias (optional)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>conversionFormat</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>None</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="3b394d89-d5f3-4413-b17b-cbb2e13a95b0">
+            <Label language="EN">Inbound Payload Format</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>None</Value>
+                <GuiLabels guid="f1e2d3c4-b5a6-9870-fedc-ba9876543210">
+                    <Label language="EN">NONE  🔀 Passthrough ⚠️ Payloads Max 20 MB</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>JSON</Value>
+                <GuiLabels guid="aea11345-4ae5-4f7a-8f96-9541e3e143b6">
+                    <Label language="EN">AVRO 🔄 JSON  ➡️ 📜 Schema Registry</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>XML</Value>
+                <GuiLabels guid="5832fa14-33ea-475e-a605-a7bf333c7092">
+                    <Label language="EN">AVRO 🔄 XML  ➡️ 📜 Schema Registry</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>PROTOBUF</Value>
+                <GuiLabels guid="aea11345-4ae5-4f7a-8f96-9541e3e143b8">
+                    <Label language="EN">PROTOBUF 🔄 JSON (experimental, not yet implemented)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>schemaRegistryHostAddress</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>https://</Default>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="555461b6-9842-4be8-abe0-725cb6850775">
+            <Label language="EN">Registry Host</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>schemaRegistryCredentialAlias</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="c1a4b7d8-26f5-4dd3-8a1e-2c4b5a104db2">
+            <Label language="EN">Credential Name</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>schemaIdResolutionMode</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>Magic Byte</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b02">
+            <Label language="EN">Schema ID Source</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>Magic Byte</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b03">
+                    <Label language="EN">🔮 Magic Wire Kafka Header</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>Fixed Schema ID</Value>
+                <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b04">
+                    <Label language="EN">📐Fixed Schema ID</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>schemaRegistrySchemaId</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="70b65bde-b728-4b0d-9df2-4f5edffb6b07">
+            <Label language="EN">Schema ID</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>tlsTrustSource</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>JVM_DEFAULT</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="a1b2c3d4-e5f6-4711-8a0b-1c2d3e4f5a61">
+            <Label language="EN">TLS Trust Source</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>JVM_DEFAULT</Value>
+                <GuiLabels guid="a1b2c3d4-e5f6-4711-8a0b-1c2d3e4f5a62">
+                    <Label language="EN">🌍 JVM Default Truststore</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>PEM_CONTENT</Value>
+                <GuiLabels guid="a1b2c3d4-e5f6-4711-8a0b-1c2d3e4f5a63">
+                    <Label language="EN">📄 PEM Content (paste certificate)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>CPI_TRUSTED_CERTIFICATE_ALIAS</Value>
+                <GuiLabels guid="a1b2c3d4-e5f6-4711-8a0b-1c2d3e4f5a64">
+                    <Label language="EN">🔑 CPI Trusted Certificate Alias</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>tlsTrustedCaPem</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="b2c3d4e5-f6a7-4822-9b1c-2d3e4f5a6b72">
+            <Label language="EN">Trusted CA PEM</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>tlsTrustedCertificateAlias</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="c3d4e5f6-a7b8-4933-ac2d-3e4f5a6b7c83">
+            <Label language="EN">CPI Trusted Certificate Alias</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>schemaCacheTtlH</Name>
+        <Usage>false</Usage>
+        <DataType>xsd:string</DataType>
+        <Default>1</Default>
+        <Length/>
+        <isparameterized>false</isparameterized>
+        <GuiLabels guid="d4e5f6a7-b8c9-4a44-bd3e-4f5a6b7c8d94">
+            <Label language="EN">Schema Cache TTL</Label>
+        </GuiLabels>
+        <FixedValues>
+            <FixedValue>
+                <Value>1</Value>
+                <GuiLabels guid="d4e5f6a7-b8c9-4a44-bd3e-4f5a6b7c8d95">
+                    <Label language="EN">⏱️ 1 hour (Default)</Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>2</Value>
+                <GuiLabels guid="d4e5f6a7-b8c9-4a44-bd3e-4f5a6b7c8d96">
+                    <Label language="EN">⏰ 2 hours (High-volume / stable schemas)</Label>
+                </GuiLabels>
+            </FixedValue>
+        </FixedValues>
+    </AttributeMetadata>
+</ComponentMetadata>

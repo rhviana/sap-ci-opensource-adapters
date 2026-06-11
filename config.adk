@@ -1,0 +1,6 @@
+Adapter-Name=EventSmartKafka
+Adapter-ID=EventSmartKafka
+Adapter-Vendor=rhviana
+Adapter-Version=1.0.0
+Enable-Maven=true
+Adapter-Description=The Event-Smart-Kafka Adapter enables SAP Cloud Integration to consume Apache Kafka and Confluent Kafka topics with optional Avro-to-JSON/XML conversion through Schema Registry.

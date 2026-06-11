@@ -1,0 +1,8 @@
+target/
+.idea/
+*.iml
+*.log
+component/
+libs/
+compile-libs/*.jar
+*.jar
