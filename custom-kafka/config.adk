@@ -1,0 +1,6 @@
+Adapter-Name=EventSmartKafka
+Adapter-ID=EventSmartKafka
+Adapter-Vendor=ricardoviana.opensource
+Adapter-Version=1.0.0
+Enable-Maven=true
+Adapter-Description=EventSmartKafka Consumer Adapter v3 performance-safe / ADK 1.0.0 by Ricardo Viana for SAP Cloud Integration Kafka consumption with guided configuration, SAP Cloud Connector TCP/SOCKS5, and optional Avro-to-JSON/XML conversion through Schema Registry.

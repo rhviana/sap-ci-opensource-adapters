@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>ricardoviana.opensource.cpi</groupId>
+  <artifactId>sdia-smart-kafka</artifactId>
+  <version>1.0.0</version>
+  <packaging>bundle</packaging>
+
+  <name>${project.groupId}.${project.artifactId}</name>
+  <description>EventSmartKafka — SAP CPI ADK Adapter v3 performance-safe Consumer-only by Ricardo Viana. SASL PLAIN/SCRAM-256/512, TLS, Avro conversion, SAP Cloud Connector TCP/SOCKS5 tunnel.</description>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- SAP ADK — published to Maven Central -->
+    <sap.adk.version>2.27.0</sap.adk.version>
+    <sap.adk.build.version>2.2.0</sap.adk.build.version>
+
+    <!--
+      Apache Camel is PROVIDED by SAP CPI runtime.
+      Do not upgrade this adapter to Camel 4.x inside CPI:
+      Camel 4.x requires Java 17+ and is outside the CPI Camel 3.14 import range.
+    -->
+    <camel.version>3.14.7</camel.version>
+    <camel.import.range>[3.14,4)</camel.import.range>
+
+    <!--
+      Kafka client embedded into the OSGi bundle.
+      Production default remains 3.6.2 because this is the validated adapter baseline.
+
+      Do NOT move this to Kafka 4.x while the adapter targets Java 8/CPI OSGi:
+      Kafka 4.x removed Java 8 support. Use the kafka-3.9.1-experimental
+      Maven profile only for side validation, not as the release default.
+    -->
+    <kafka.clients.version>3.6.2</kafka.clients.version>
+
+    <!-- OSGi bundle version. Overridden by experimental profiles when needed. -->
+    <bundle.version>1.0.0.ricardoviana.perfsafe</bundle.version>
+
+    <!-- Java 8 bytecode target required by CPI OSGi runtime. -->
+    <maven.compiler.release>8</maven.compiler.release>
+    <bundle.execution.environment>JavaSE-1.8</bundle.execution.environment>
+
+    <!-- Logging — provided by CPI OSGi runtime -->
+    <slf4j.version>1.7.36</slf4j.version>
+
+    <!-- Build plugins -->
+    <maven.bundle.plugin.version>5.1.9</maven.bundle.plugin.version>
+    <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
+    <maven.dependency.plugin.version>3.6.1</maven.dependency.plugin.version>
+    <maven.antrun.plugin.version>3.1.0</maven.antrun.plugin.version>
+    <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
+  </properties>
+
+  <dependencies>
+
+    <!-- ── SAP ADK public APIs — provided by CPI OSGi runtime ── -->
+    <dependency>
+      <groupId>com.sap.cloud.adk</groupId>
+      <artifactId>generic.api</artifactId>
+      <version>${sap.adk.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.sap.cloud.adk</groupId>
+      <artifactId>adapter.api</artifactId>
+      <version>${sap.adk.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── Apache Camel — provided by CPI OSGi runtime ── -->
+    <dependency>
+      <groupId>org.apache.camel</groupId>
+      <artifactId>camel-core</artifactId>
+      <version>${camel.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── SLF4J — provided by CPI OSGi runtime ── -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── Kafka client — compile scope; classes unpacked into bundle ── -->
+    <!--    KerberosError.class is excluded (replaced by local stub for OSGi). -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>${kafka.clients.version}</version>
+      <scope>compile</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <defaultGoal>install</defaultGoal>
+
+    <plugins>
+
+      <!-- ── 0. Build guardrails ───────────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven.enforcer.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-build-runtime-guardrails</id>
+            <phase>validate</phase>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <!-- Build with JDK 11+ but keep Java 8 bytecode output for CPI. -->
+                <requireJavaVersion>
+                  <version>[11,)</version>
+                  <message>Build with JDK 11+; output remains Java 8 bytecode via maven.compiler.release=8.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.6.0,)</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── 1. Unpack kafka-clients into target/classes (excluding Kerberos stubs) ── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>${maven.dependency.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>unpack-kafka-client-without-kerberos-error</id>
+            <phase>generate-resources</phase>
+            <goals><goal>unpack</goal></goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.kafka</groupId>
+                  <artifactId>kafka-clients</artifactId>
+                  <version>${kafka.clients.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                  <excludes>
+                    META-INF/MANIFEST.MF,
+                    META-INF/*.SF,
+                    META-INF/*.DSA,
+                    META-INF/*.RSA,
+                    META-INF/INDEX.LIST,
+                    META-INF/maven/**,
+                    module-info.class,
+                    META-INF/versions/**,
+                    org/apache/kafka/common/security/kerberos/KerberosError.class
+                  </excludes>
+                </artifactItem>
+              </artifactItems>
+              <overWriteReleases>true</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── 2. Java 8 bytecode (CPI OSGi requirement) ── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven.compiler.plugin.version}</version>
+        <configuration>
+          <release>${maven.compiler.release}</release>
+          <compilerArgs>
+            <arg>-Xlint:-options</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <!-- ── 3. OSGi bundle manifest ── -->
+      <plugin>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>maven-bundle-plugin</artifactId>
+        <version>${maven.bundle.plugin.version}</version>
+        <extensions>true</extensions>
+        <configuration>
+          <instructions>
+            <Bundle-SymbolicName>ricardoviana.opensource.cpi.sdia.smart.kafka</Bundle-SymbolicName>
+            <Bundle-Name>EventSmartKafka Ricardoviana</Bundle-Name>
+            <Bundle-Version>${bundle.version}</Bundle-Version>
+            <Bundle-Description>EventSmartKafka SAP CPI Kafka Consumer Adapter v3.0 — Ricardo Viana / SDIA</Bundle-Description>
+
+            <!--
+              Kafka client classes are embedded via the unpack execution above.
+              KerberosError is replaced by a local stub (no GSSAPI/Kerberos dependency).
+              JGSS stubs keep the Kerberos login path from resolving — CPI OSGi does not
+              export org.ietf.jgss.
+            -->
+            <Embed-Transitive>false</Embed-Transitive>
+            <Private-Package>
+              org.apache.kafka.*,
+              org.ietf.jgss,
+              org.ietf.jgss.*,
+              javax.security.auth.kerberos,
+              javax.security.auth.kerberos.*
+            </Private-Package>
+
+            <Export-Package>custom.opensource.cpi.sdia.smart.kafka</Export-Package>
+
+            <Import-Package>
+              org.apache.camel.*;version="${camel.import.range}",
+              com.sap.cloud.adk.*,
+              com.sap.it.api.*,
+              org.slf4j.*,
+              javax.management.*,
+              javax.net.ssl.*,
+              javax.crypto.*,
+              javax.security.*,
+              org.ietf.jgss.*;resolution:=optional,
+              org.ietf.jgss;resolution:=optional,
+              com.sun.security.auth.module;resolution:=optional,
+              sun.security.krb5;resolution:=optional,
+              com.ibm.security.krb5.*;resolution:=optional,
+              org.xerial.snappy.*;resolution:=optional,
+              net.jpountz.*;resolution:=optional,
+              com.github.luben.zstd.*;resolution:=optional,
+              javax.*;resolution:=optional,
+              javax.security.auth.kerberos;resolution:=optional,
+              javax.security.auth.kerberos.*;resolution:=optional,
+              *;resolution:=optional
+            </Import-Package>
+
+            <DynamicImport-Package>*</DynamicImport-Package>
+            <Bundle-RequiredExecutionEnvironment>${bundle.execution.environment}</Bundle-RequiredExecutionEnvironment>
+            <Eclipse-BuddyPolicy>global</Eclipse-BuddyPolicy>
+          </instructions>
+        </configuration>
+      </plugin>
+
+      <!-- ── 4. Copy final jar to /component for ADK build ── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>${maven.antrun.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-adk-component-directory</id>
+            <phase>package</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <mkdir dir="${project.basedir}/component"/>
+                <delete quiet="true">
+                  <fileset dir="${project.basedir}/component" includes="*.jar"/>
+                </delete>
+                <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                      todir="${project.basedir}/component"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── 5. SAP ADK build plugin — generates .aar adapter archive ── -->
+      <plugin>
+        <groupId>com.sap.cloud.adk</groupId>
+        <artifactId>com.sap.cloud.adk.build.archive</artifactId>
+        <version>${sap.adk.build.version}</version>
+      </plugin>
+
+    </plugins>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>com.sap.cloud.adk</groupId>
+          <artifactId>com.sap.cloud.adk.build.archive</artifactId>
+          <executions>
+            <execution>
+              <id>execute-checks</id>
+              <phase>package</phase>
+              <goals><goal>check</goal></goals>
+              <configuration>
+                <adapterProjectDirectory>${project.basedir}</adapterProjectDirectory>
+              </configuration>
+            </execution>
+            <execution>
+              <id>build-adapter</id>
+              <phase>install</phase>
+              <goals><goal>build</goal></goals>
+              <configuration>
+                <adapterProjectDirectory>${project.basedir}</adapterProjectDirectory>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+  </build>
+
+  <profiles>
+    <!--
+      Experimental only:
+      Kafka 3.9.1 is the highest practical line to evaluate while keeping a Java 8
+      CPI adapter. Do not use this profile as the release default until the full
+      CPI matrix passes again: PLAINTEXT, SASL_PLAINTEXT, SASL_SSL, SCC relay,
+      Avro Magic Byte, Fixed Schema ID, TIMESEEK and poison pill handling.
+
+      Usage:
+        mvn clean install -Pkafka-3.9.1-experimental
+    -->
+    <profile>
+      <id>kafka-3.9.1-experimental</id>
+      <properties>
+        <kafka.clients.version>3.9.1</kafka.clients.version>
+        <bundle.version>1.0.0.kafka391.perfsafe</bundle.version>
+      </properties>
+    </profile>
+
+    <!--
+      Laboratory only — NOT the CPI-safe default.
+      Apache Camel 4.4.x requires Java 17/21 and Jakarta-era APIs.
+      Use this only to check source compatibility outside CPI or on a runtime that actually exports Camel 4.4 packages.
+
+      Usage:
+        mvn clean package -Pcamel-4.4-lab
+    -->
+    <profile>
+      <id>camel-4.4-lab</id>
+      <properties>
+        <camel.version>4.4.4</camel.version>
+        <maven.compiler.release>17</maven.compiler.release>
+        <camel.import.range>[4.4,5)</camel.import.range>
+        <bundle.execution.environment>JavaSE-17</bundle.execution.environment>
+        <bundle.version>1.0.0.camel44lab.perfsafe</bundle.version>
+      </properties>
+    </profile>
+
+  </profiles>
+
+
+</project>
