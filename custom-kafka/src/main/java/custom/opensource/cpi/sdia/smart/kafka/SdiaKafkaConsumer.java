@@ -75,6 +75,14 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             new LinkedHashMap<TopicPartition, OffsetAndMetadata>();
 
     /**
+     * Pending seek timestamp for "Read all from timestamp" mode.
+     * Applied inside onPartitionsAssigned so the consumer stays in the group
+     * and normal offset commits continue to work without rebalance failures.
+     * -1L means no pending seek.
+     */
+    private volatile long pendingSubscribeSeekTimestampMs = -1L;
+
+    /**
      * Message Recovery single-read guard.
      * When enabled, the adapter reads only the first record resolved by the recovery seek
      * and then remains silent until recovery is disabled/redeployed. This prevents a
@@ -86,8 +94,8 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
 
     /**
      * Avro/conversion failures are adapter-level failures, not Integration Flow processing failures.
-     * They must NOT commit the failed offset. The consumer remains alive and retries the same
-     * offset after a small backoff, avoiding a permanent polling death that requires redeploy.
+     * They must NOT commit the failed offset. Deterministic poison payloads are parked terminally
+     * for Stop/Retry policies to avoid reprocessing the same Kafka offset forever.
      */
     private volatile boolean fatalAvroConversionFailure = false;
     private volatile String fatalAvroConversionReason = null;
@@ -101,6 +109,7 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
      */
     private volatile boolean stoppedByErrorPolicy = false;
     private volatile String stoppedByErrorPolicyReason = null;
+    private volatile long lastStoppedLogAtMs = 0L;
 
     /**
      * Fatal initialization failure — wrong config, unreachable broker, missing topic, etc.
@@ -146,7 +155,6 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
      */
     private volatile boolean onPremiseForcedAssignMode = false;
 
-    private static final long INIT_FAILURE_RETRY_BACKOFF_MS = 5000L;
     private static final long EMPTY_POLL_DIAG_LOG_EVERY_MS = 300000L;
     private static final Duration ADMIN_LIST_TOPICS_TIMEOUT = Duration.ofMillis(4000L);
 
@@ -249,6 +257,8 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
         this.nextInitRetryAllowedAtMs = 0L;
         this.nonRetryableConfigurationFailure = false;
         this.lastEmptyPollLogAtMs = 0L;
+        this.lastStoppedLogAtMs = 0L;
+        this.pendingSubscribeSeekTimestampMs = -1L;
         this.onPremiseClientBootstrapServers = null;
         this.onPremiseForcedAssignMode = false;
         closeOnPremiseTcpTunnelSilently();
@@ -472,11 +482,23 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
         String brokerAlias = trimToNull(endpoint.getCredentialAlias());
         if (isPlainTextAuthentication(endpoint.getAuthentication())) {
             if (brokerAlias != null) {
-                LOG.warn("[SDIA Kafka] Authentication is NONE | PLAINTEXT. Ignoring configured Credential Alias ["
+                LOG.warn("[SDIA Kafka] Authentication is NONE. Ignoring configured Credential Alias ["
                         + brokerAlias + "] for broker connection. No Secure Store/User Credential lookup will be performed.");
             } else {
-                LOG.warn("[SDIA Kafka] Authentication is NONE | PLAINTEXT. Broker credential is not required and will not be resolved.");
+                LOG.warn("[SDIA Kafka] Authentication is NONE. Broker credential is not required and will not be resolved.");
             }
+        } else if (endpoint.isMtlsAuthentication(endpoint.getAuthentication())) {
+            // mTLS — pre-validate that the keystore alias is resolvable.
+            final String keyAlias = trimToNull(endpoint.getMtlsKeyAlias());
+            if (keyAlias == null) {
+                this.nonRetryableConfigurationFailure = true;
+                String errorMsg = "[SDIA Kafka] mTLS authentication requires 'mtlsKeyAlias'. "
+                        + "Provide a CPI Keystore alias containing the client private key and certificate chain.";
+                LOG.error("[SDIA Kafka] " + errorMsg);
+                try { SdiaKafkaEndpointInformationService.register(endpoint.getTopicPattern(), errorMsg); } catch (Throwable t) {}
+                return errorMsg;
+            }
+            LOG.warn("[SDIA Kafka] mTLS authentication selected. Client certificate will be loaded from Keystore alias: " + keyAlias);
         } else if (isSaslAuthentication(endpoint.getAuthentication())) {
             if (brokerAlias == null) {
                 this.nonRetryableConfigurationFailure = true;
@@ -520,7 +542,9 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                         + " | locationId=" + displayOptionalLocationId(endpoint.getSapSapccLocationId()));
             } catch (Throwable tunnelEx) {
                 final String root = rootCauseMessage(tunnelEx);
-                this.nonRetryableConfigurationFailure = isNonRetryableCloudConnectorTunnelFailure(root);
+                this.nonRetryableConfigurationFailure = true;
+                this.fatalInitFailure = true;
+                this.fatalInitReason = root;
                 String errorMsg = buildCloudConnectorTunnelError(bootstrapServers, root);
                 LOG.error("[SDIA Kafka] " + errorMsg, tunnelEx);
                 try { SdiaKafkaEndpointInformationService.register(endpoint.getTopicPattern(), errorMsg); } catch (Throwable t) {}
@@ -560,7 +584,9 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 }
             } catch (Throwable netEx) {
                 String cause = rootCauseMessage(netEx);
-                this.nonRetryableConfigurationFailure = isNonRetryableKafkaStartupFailure(cause);
+                this.nonRetryableConfigurationFailure = true;
+                this.fatalInitFailure = true;
+                this.fatalInitReason = cause;
                 String errorMsg = buildKafkaBrokerConnectionConfigurationError(cause, endpoint.resolveBootstrapServers());
                 LOG.error("[SDIA Kafka] " + errorMsg, netEx);
                 try { SdiaKafkaEndpointInformationService.register(endpoint.getTopicPattern(), errorMsg); } catch (Throwable t) {}
@@ -573,6 +599,24 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             String partitionsParam = trimToNull(endpoint.getPartitions());
             String topicExpression = trimToNull(endpoint.getTopicPattern());
             List<String> topicEntries = parseTopicExpression(topicExpression);
+
+            // ── Parallel consumers + explicit partition conflict ───────────────
+            // Explicit partition uses assign() which bypasses the consumer group.
+            // Parallelism requires subscribe() + group rebalance to distribute
+            // partitions. The two modes are mutually exclusive.
+            final int parallelCount = endpoint.getParallelConsumers() != null
+                    ? endpoint.getParallelConsumers().intValue() : 1;
+            if (parallelCount > 1 && partitionsParam != null) {
+                this.nonRetryableConfigurationFailure = true;
+                String errorMsg = buildPartitionConfigurationError(topicExpression,
+                        "Parallel Consumers > 1 cannot be combined with explicit Partition configuration. "
+                        + "Remove the Partition field to allow Kafka to distribute partitions automatically "
+                        + "among the " + parallelCount + " parallel consumers via group rebalance.");
+                LOG.error("[SDIA Kafka] " + errorMsg);
+                try { SdiaKafkaEndpointInformationService.register(endpoint.getTopicPattern(), errorMsg); } catch (Throwable t) {}
+                closeKafkaConsumerSilently();
+                return errorMsg;
+            }
             this.effectiveGroupId = String.valueOf(props.get(ConsumerConfig.GROUP_ID_CONFIG));
             if (this.effectiveGroupId == null
                     || this.effectiveGroupId.trim().isEmpty()
@@ -610,13 +654,93 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                         (isOnPremiseProxyMode() ? "on-premise" : "cloud") + " explicit channel partitions");
             } else {
                 assignMode = false;
+
+                // "Read all from timestamp" — consumer stays in subscribe() group.
+                // Seek is registered here and applied inside onPartitionsAssigned
+                // so normal offset commits continue to work (no unsubscribe/assign needed).
+                final boolean readAllRecovery = endpoint.isMessageRecoveryEnabled()
+                        && !endpoint.isRecoverySingleMessageOnly()
+                        && endpoint.getSeekToTimestampMs() > 0L;
+
+                if (readAllRecovery) {
+                    this.pendingSubscribeSeekTimestampMs = endpoint.getSeekToTimestampMs();
+                    this.recoverySeekInput = endpoint.getRecoveryTimestampValue();
+                    this.recoverySeekTimestampMs = endpoint.getSeekToTimestampMs();
+                    LOG.warn("[SDIA Kafka] Read-all recovery: seek will be applied via onPartitionsAssigned."
+                            + " | timestampMs=" + endpoint.getSeekToTimestampMs()
+                            + " | group.id=" + effectiveGroupId
+                            + " | normalGroupCommitsActive=true");
+                } else {
+                    this.pendingSubscribeSeekTimestampMs = -1L;
+                }
+
+                org.apache.kafka.clients.consumer.ConsumerRebalanceListener rebalanceListener =
+                        new org.apache.kafka.clients.consumer.ConsumerRebalanceListener() {
+                            @Override
+                            public void onPartitionsRevoked(
+                                    java.util.Collection<TopicPartition> partitions) {}
+
+                            @Override
+                            public void onPartitionsAssigned(
+                                    java.util.Collection<TopicPartition> partitions) {
+                                final long seekTs = pendingSubscribeSeekTimestampMs;
+                                if (seekTs <= 0L || partitions == null || partitions.isEmpty()) {
+                                    return;
+                                }
+                                try {
+                                    final Map<TopicPartition, Long> timestamps =
+                                            new LinkedHashMap<TopicPartition, Long>();
+                                    for (TopicPartition tp : partitions) {
+                                        timestamps.put(tp, Long.valueOf(seekTs));
+                                    }
+                                    final Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndTimestamp> offsets =
+                                            kafkaConsumer.offsetsForTimes(timestamps);
+
+                                    int applied = 0;
+                                    for (TopicPartition tp : partitions) {
+                                        final org.apache.kafka.clients.consumer.OffsetAndTimestamp oat =
+                                                offsets != null ? offsets.get(tp) : null;
+                                        if (oat != null) {
+                                            kafkaConsumer.seek(tp, oat.offset());
+                                            recoverySeekOffsets.put(tp, Long.valueOf(oat.offset()));
+                                            applied++;
+                                            LOG.warn("[SDIA Kafka] Read-all recovery seek applied."
+                                                    + " | topic=" + tp.topic()
+                                                    + " | partition=" + tp.partition()
+                                                    + " | timestampMs=" + seekTs
+                                                    + " | offset=" + oat.offset());
+                                        } else {
+                                            kafkaConsumer.seekToEnd(
+                                                    java.util.Collections.singletonList(tp));
+                                            LOG.warn("[SDIA Kafka] Read-all recovery: no offset for timestamp,"
+                                                    + " seekToEnd applied."
+                                                    + " | topic=" + tp.topic()
+                                                    + " | partition=" + tp.partition());
+                                        }
+                                    }
+                                    pendingSubscribeSeekTimestampMs = -1L;
+                                    recoverySeekApplied = true;
+                                    LOG.warn("[SDIA Kafka] Read-all recovery seek completed via onPartitionsAssigned."
+                                            + " | group.id=" + effectiveGroupId
+                                            + " | timestampMs=" + seekTs
+                                            + " | partitions=" + partitions.size()
+                                            + " | appliedSeeks=" + applied
+                                            + " | normalGroupCommitsActive=true");
+                                } catch (Throwable seekEx) {
+                                    LOG.error("[SDIA Kafka] Read-all recovery seek failed in onPartitionsAssigned: "
+                                            + rootCauseMessage(seekEx), seekEx);
+                                }
+                            }
+                        };
+
                 if (containsPatternMode(topicEntries)) {
                     Pattern pattern = compileTopicPatternExpression(topicEntries);
-                    kafkaConsumer.subscribe(pattern);
+                    kafkaConsumer.subscribe(pattern, rebalanceListener);
                     LOG.warn("[SDIA Kafka] Consumer subscribed by topic pattern. Normal Kafka group management is active."
                             + " | onPremise=" + isOnPremiseProxyMode()
                             + " | group.id=" + effectiveGroupId
-                            + " | topicPattern=" + topicExpression);
+                            + " | topicPattern=" + topicExpression
+                            + " | readAllRecovery=" + readAllRecovery);
                 } else {
                     List<String> missingTopics = findMissingTopics(knownTopics, topicEntries);
                     if (!missingTopics.isEmpty()) {
@@ -627,11 +751,29 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                         closeKafkaConsumerSilently();
                         return errorMsg;
                     }
-                    kafkaConsumer.subscribe(topicEntries);
+                    kafkaConsumer.subscribe(topicEntries, rebalanceListener);
                     LOG.warn("[SDIA Kafka] Consumer subscribed by exact topic list. Normal Kafka group management is active."
                             + " | onPremise=" + isOnPremiseProxyMode()
                             + " | group.id=" + effectiveGroupId
-                            + " | topics=" + topicEntries);
+                            + " | topics=" + topicEntries
+                            + " | readAllRecovery=" + readAllRecovery);
+
+                    // Warn if parallelConsumers > total partition count
+                    if (parallelCount > 1 && knownTopics != null) {
+                        int totalPartitions = 0;
+                        for (String t : topicEntries) {
+                            java.util.List<org.apache.kafka.common.PartitionInfo> pInfo = knownTopics.get(t);
+                            if (pInfo != null) totalPartitions += pInfo.size();
+                        }
+                        if (totalPartitions > 0 && parallelCount > totalPartitions) {
+                            LOG.warn("[SDIA Kafka] ⚠️ PARALLEL CONSUMERS WARNING: parallelConsumers=" + parallelCount
+                                    + " exceeds total topic partitions=" + totalPartitions
+                                    + ". Only " + totalPartitions + " consumer(s) will be active."
+                                    + " The remaining " + (parallelCount - totalPartitions) + " will be idle."
+                                    + " Set parallelConsumers <= " + totalPartitions + " to avoid idle threads."
+                                    + " | topics=" + topicEntries);
+                        }
+                    }
                 }
             }
 
@@ -657,7 +799,9 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
 
         } catch (Exception e) {
             final String root = rootCauseMessage(e);
-            this.nonRetryableConfigurationFailure = isNonRetryableStartupFailure(root);
+            this.nonRetryableConfigurationFailure = true;
+            this.fatalInitFailure = true;
+            this.fatalInitReason = root;
             String errorMsg = buildUnexpectedStartupError(root);
             LOG.error("[SDIA Kafka] " + errorMsg, e);
             try { SdiaKafkaEndpointInformationService.register(endpoint.getTopicPattern(), errorMsg); } catch (Throwable t) {}
@@ -678,6 +822,13 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             // partition assignment after CPI redeploy/channel changes and create the
             // 5-10 minute "zombie" symptom. The KafkaConsumer is closed when STOP is
             // activated, so the group is released quickly and this instance remains silent.
+            final long nowMs = System.currentTimeMillis();
+            if (nowMs - lastStoppedLogAtMs > 60000L) {
+                lastStoppedLogAtMs = nowMs;
+                LOG.warn("[SDIA Kafka] Consumer is STOPPED by error policy. "
+                        + "Undeploy and redeploy the iFlow to resume consumption. "
+                        + "reason=" + (stoppedByErrorPolicyReason == null ? "<unknown>" : stoppedByErrorPolicyReason));
+            }
             return 0;
         }
 
@@ -698,39 +849,27 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
         }
 
         if (fatalInitFailure) {
-            if (nonRetryableConfigurationFailure) {
-                return 0;
-            }
-
-            long now = System.currentTimeMillis();
-            if (now < nextInitRetryAllowedAtMs) {
-                return 0;
-            }
-
-            LOG.warn("[SDIA Kafka] Previous initialization/runtime failure cooldown finished. Retrying Kafka consumer initialization now. Last reason: "
-                    + (fatalInitReason == null ? "<empty>" : fatalInitReason));
-            this.fatalInitFailure = false;
-            this.fatalInitReason = null;
-            this.initialized = false;
-            closeKafkaConsumerSilently();
+            // Any failure — broker offline, cert wrong, config error, SOCKS5 down — stops here.
+            // No retry. Operator must fix the issue and redeploy.
+            return 0;
         }
 
         if (!initialized) {
             String initError = tryDelayedInitialize();
             if (initError != null) {
                 this.fatalInitFailure = true;
+                this.nonRetryableConfigurationFailure = true;
                 this.fatalInitReason = initError;
-                this.nextInitRetryAllowedAtMs = System.currentTimeMillis() + INIT_FAILURE_RETRY_BACKOFF_MS;
                 surfaceErrorToChannel(initError);
                 return 0;
             }
         }
 
         if (kafkaConsumer == null) {
-            String err = "kafkaConsumer is null after initialization. Internal runtime state will be recycled and retried.";
+            String err = "kafkaConsumer is null after initialization. Internal runtime state error — redeploy required.";
             this.fatalInitFailure = true;
+            this.nonRetryableConfigurationFailure = true;
             this.fatalInitReason = err;
-            this.nextInitRetryAllowedAtMs = System.currentTimeMillis() + INIT_FAILURE_RETRY_BACKOFF_MS;
             this.initialized = false;
             surfaceErrorToChannel(err);
             return 0;
@@ -753,6 +892,16 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 this.nonRetryableConfigurationFailure = true;
             } else {
                 err = buildPollFailureError(rootCauseMessage(pollEx));
+                // If we are in On-Premise mode and the poll fails, the Cloud Connector
+                // tunnel has dropped during active consumption. This is treated as
+                // nonRetryable for the same reason as tunnel startup failures:
+                // the operator must verify CC is up and redeploy the iFlow.
+                // Retrying silently would re-initialize the tunnel and start consuming
+                // from a potentially stale offset without the operator being aware.
+                if (isOnPremiseProxyMode()) {
+                    this.nonRetryableConfigurationFailure = true;
+                    closeOnPremiseTcpTunnelSilently();
+                }
             }
             registerRuntimeStatus("Event.Smart.Kafka.Engine.Poll.Failure", null, pollEx);
             LOG.error("[SDIA Kafka] " + err, pollEx);
@@ -761,8 +910,8 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             closeKafkaConsumerSilently();
             this.initialized = false;
             this.fatalInitFailure = true;
+            this.nonRetryableConfigurationFailure = true;
             this.fatalInitReason = err;
-            this.nextInitRetryAllowedAtMs = System.currentTimeMillis() + INIT_FAILURE_RETRY_BACKOFF_MS;
             try { surfaceErrorToChannel(err); } catch (Throwable ignored) {}
             return 0;
         }
@@ -887,10 +1036,10 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 commitSuccessOffsets(successOffsets, delivered);
                 haltConsumerAfterPipelineFailure(record, processorFatalMsg, ex);
 
-                if ("Stop on Error".equalsIgnoreCase(handling)) {
-                    // Same rule as conversion Stop on Error: do not bubble the exception into
-                    // ScheduledPollConsumer/Camel, because that may restart the route and allow
-                    // the next offset to be consumed. Stop means freeze this deployed instance.
+                if ("Stop on Error".equalsIgnoreCase(handling)
+                        || "Retry Failed Message".equalsIgnoreCase(handling)) {
+                    // Same rule as conversion Stop/Retry terminal failures: do not bubble the exception into
+                    // ScheduledPollConsumer/Camel, because that may restart the route and re-read the same offset.
                     return delivered;
                 }
 
@@ -1037,6 +1186,19 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             return;
         }
 
+        // In assign mode the consumer left the group via unsubscribe().
+        // commitSync on a group coordinator that already rebalanced will always fail with
+        // "group has already rebalanced and assigned the partitions to another member".
+        // The official group offset was never moved by the recovery seek anyway,
+        // so skipping restore is correct and safe.
+        if (assignMode) {
+            LOG.warn("[SDIA Kafka] Message Recovery single-record mode completed in assign mode. "
+                    + "Group offset restore skipped — consumer is not part of a subscribe() group."
+                    + " | result=" + result
+                    + " | recoveredOffset=" + (record == null ? -1L : record.offset()));
+            return;
+        }
+
         if (recoveryOriginalCommittedOffsets.isEmpty()) {
             LOG.warn("[SDIA Kafka] Message Recovery single-record mode completed without committing recovered offset. "
                     + "No original committed offset existed for this group/partition, so no offset restoration was required."
@@ -1077,10 +1239,10 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
      * publishing the error is not a successful delivery and must never commit the Kafka offset.
      */
     private void publishStopErrorExchangeToIFlow(final Exchange exchange,
-                                                final ConsumerRecord<String, byte[]> record,
-                                                final String fatalMsg,
-                                                final Throwable cause,
-                                                final String failureType) {
+                                                 final ConsumerRecord<String, byte[]> record,
+                                                 final String fatalMsg,
+                                                 final Throwable cause,
+                                                 final String failureType) {
         if (exchange == null) {
             LOG.warn("[SDIA Kafka] Stop on Error visibility skipped because exchange is null. failedOffset="
                     + (record == null ? "<unknown>" : String.valueOf(record.offset())));
@@ -1159,7 +1321,7 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             }
         }
 
-        LOG.error("[SDIA Kafka] All " + retries + " retry attempts exhausted. Offset NOT committed — record will be re-delivered after iFlow restart.");
+        LOG.error("[SDIA Kafka] All " + retries + " retry attempts exhausted. Offset NOT committed — adapter instance will stop silently until redeploy/restart to avoid an infinite reprocessing loop.");
         if (lastFailure instanceof Exception) {
             throw (Exception) lastFailure;
         }
@@ -1233,9 +1395,9 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
     }
 
     private String buildOffsetPositioningError(final String reason,
-                                                final String reset,
-                                                final List<TopicPartition> topicPartitions,
-                                                final String cause) {
+                                               final String reset,
+                                               final List<TopicPartition> topicPartitions,
+                                               final String cause) {
         return buildCompactRuntimeError(
                 "Assigned start offset positioning failed",
                 "Event.Smart.Kafka.Offset.Positioning.Failed",
@@ -1275,6 +1437,18 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             return null;
         }
 
+        // "Read all from timestamp" — seek already registered as pendingSubscribeSeekTimestampMs
+        // and will be applied via onPartitionsAssigned on the first poll(). The consumer stays
+        // in the subscribe() group so normal offset commits work without rebalance failures.
+        if (!endpoint.isRecoverySingleMessageOnly()) {
+            LOG.warn("[SDIA Kafka] Read-all recovery: seek deferred to onPartitionsAssigned."
+                    + " | timestampMs=" + seekTs
+                    + " | group.id=" + effectiveGroupId
+                    + " | assignMode unchanged=false");
+            return null;
+        }
+
+        // "Read only first matched message" — uses assign() for deterministic single-record replay.
         this.recoverySeekApplied = false;
         this.recoverySeekTimestampMs = seekTs;
         this.recoverySeekInput = endpoint.getRecoveryTimestampValue();
@@ -1487,8 +1661,8 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             closeKafkaConsumerSilently();
             this.initialized = false;
             this.fatalInitFailure = true;
+            this.nonRetryableConfigurationFailure = true;
             this.fatalInitReason = errorMsg;
-            this.nextInitRetryAllowedAtMs = System.currentTimeMillis() + INIT_FAILURE_RETRY_BACKOFF_MS;
 
             throw new RuntimeCamelException(errorMsg, commitEx);
         }
@@ -1554,22 +1728,16 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             return;
         }
 
-        // Retry Failed Message behavior: do not commit; seek back and retry the same offset after backoff.
-        this.fatalAvroConversionFailure = true;
-        this.fatalAvroConversionReason = reason;
-        this.nextAvroRetryAllowedAtMs = System.currentTimeMillis() + AVRO_FAILURE_RETRY_BACKOFF_MS;
+        // Retry Failed Message is bounded. After the configured retry path reaches this deterministic
+        // conversion failure, park the adapter without committing the failed offset. Retrying the same
+        // invalid bytes forever only creates an operational loop.
+        this.stoppedByErrorPolicy = true;
+        this.stoppedByErrorPolicyReason = reason;
+        this.fatalAvroConversionFailure = false;
+        this.fatalAvroConversionReason = null;
+        this.nextAvroRetryAllowedAtMs = 0L;
 
-        try {
-            if (kafkaConsumer != null && record != null) {
-                TopicPartition tp = topicPartition(record);
-                kafkaConsumer.seek(tp, record.offset());
-                LOG.warn("[SDIA Kafka] Retry Failed Message policy after Avro conversion failure — offset NOT committed. Seeked back to offset "
-                        + record.offset() + " on " + record.topic() + "-" + record.partition()
-                        + ". Next retry in " + AVRO_FAILURE_RETRY_BACKOFF_MS + " ms.");
-            }
-        } catch (Throwable seekEx) {
-            LOG.warn("[SDIA Kafka] Could not seek back after Avro conversion failure: " + rootCauseMessage(seekEx));
-        }
+        stopConsumerForTerminalFailure(record, cause, "Avro conversion failure after Retry Failed Message", "Retry Failed Message");
     }
 
     private void haltConsumerAfterPipelineFailure(ConsumerRecord<String, byte[]> record, String reason, Throwable cause) {
@@ -1586,13 +1754,20 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
             return;
         }
 
+        if ("Retry Failed Message".equalsIgnoreCase(handling)) {
+            this.stoppedByErrorPolicy = true;
+            this.stoppedByErrorPolicyReason = reason;
+            stopConsumerForTerminalFailure(record, cause, "Pipeline processor failure after Retry Failed Message exhaustion", "Retry Failed Message");
+            return;
+        }
+
         this.initialized = false;
 
         try {
             if (kafkaConsumer != null && record != null) {
                 TopicPartition tp = topicPartition(record);
                 kafkaConsumer.seek(tp, record.offset());
-                LOG.warn("[SDIA Kafka] Pipeline failure retry policy — offset NOT committed. Seeked back to offset "
+                LOG.warn("[SDIA Kafka] Pipeline failure policy — offset NOT committed. Seeked back to offset "
                         + record.offset() + " on " + record.topic() + "-" + record.partition() + ".");
             }
         } catch (Throwable seekEx) {
@@ -1605,30 +1780,38 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
     private void stopConsumerForStopOnError(final ConsumerRecord<String, byte[]> record,
                                             final Throwable cause,
                                             final String failureType) {
+        stopConsumerForTerminalFailure(record, cause, failureType, "Stop on Error");
+    }
+
+    private void stopConsumerForTerminalFailure(final ConsumerRecord<String, byte[]> record,
+                                                final Throwable cause,
+                                                final String failureType,
+                                                final String policyName) {
+        final String policy = policyName == null ? "Terminal Error" : policyName;
         try {
             if (kafkaConsumer != null && record != null) {
                 TopicPartition failedPartition = topicPartition(record);
                 try {
                     kafkaConsumer.seek(failedPartition, record.offset());
                 } catch (Throwable seekEx) {
-                    LOG.warn("[SDIA Kafka] Stop on Error could not seek back to failed offset before shutdown: "
+                    LOG.warn("[SDIA Kafka] " + policy + " could not seek back to failed offset before shutdown: "
                             + rootCauseMessage(seekEx));
                 }
 
-                LOG.error("[SDIA Kafka] Stop on Error policy activated. Offset NOT committed. "
-                        + "KafkaConsumer will be closed and this deployed adapter instance will stay silent until redeploy/restart. "
-                        + "This avoids paused-heartbeat zombie consumers holding the partition assignment. "
-                        + "failureType=" + failureType
-                        + " | topic=" + record.topic()
-                        + " | partition=" + record.partition()
-                        + " | failedOffset=" + record.offset(),
+                LOG.error("[SDIA Kafka] " + policy + " policy activated. Offset NOT committed. "
+                                + "KafkaConsumer will be closed and this deployed adapter instance will stay silent until redeploy/restart. "
+                                + "This avoids infinite reprocessing loops and paused-heartbeat zombie consumers holding the partition assignment. "
+                                + "failureType=" + failureType
+                                + " | topic=" + record.topic()
+                                + " | partition=" + record.partition()
+                                + " | failedOffset=" + record.offset(),
                         cause);
             } else {
-                LOG.error("[SDIA Kafka] Stop on Error policy activated without active KafkaConsumer/record. "
+                LOG.error("[SDIA Kafka] " + policy + " policy activated without active KafkaConsumer/record. "
                         + "Offset was NOT committed. Adapter instance is stopped until redeploy/restart.", cause);
             }
         } catch (Throwable stopEx) {
-            LOG.warn("[SDIA Kafka] Stop on Error shutdown handler failed; adapter remains logically stopped: "
+            LOG.warn("[SDIA Kafka] " + policy + " shutdown handler failed; adapter remains logically stopped: "
                     + rootCauseMessage(stopEx));
         } finally {
             // Critical CPI/ADK behavior:
@@ -1839,6 +2022,11 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
         final int configuredMaxPollRecords = endpoint.getMaxPollRecords() != null ? endpoint.getMaxPollRecords().intValue() : 1;
         final int effectiveMaxPollRecords = configuredMaxPollRecords;
         props.put("max.poll.records", String.valueOf(effectiveMaxPollRecords));
+        // NOTE: max.poll.records limits how many records are DELIVERED per poll() call, not how many
+        // are fetched from the broker. Kafka pre-fetches data into an internal buffer regardless of this
+        // setting. Setting max.poll.records=1 will process one record per poll cycle but the broker
+        // fetch may already have more in buffer — they will be delivered in subsequent poll() calls.
+        // This is standard Kafka KafkaConsumer behavior, not an adapter limitation.
 
         props.put("session.timeout.ms", String.valueOf(sessionTimeoutMs));
         props.put("heartbeat.interval.ms", String.valueOf(heartbeatIntervalMs));
@@ -1886,8 +2074,41 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                     ? kafkaConsumer.subscription()
                     : java.util.Collections.<String>emptySet();
 
+            // ── New group + LATEST detection ──────────────────────────────────
+            // If the consumer group has no committed offsets on any assigned partition
+            // and auto.offset.reset=latest, messages already in the topic will be
+            // silently skipped. Warn the operator so they know what to do.
+            final String offsetReset = normalizeAutoOffsetReset(endpoint.getAutoOffsetReset());
+            if ("latest".equalsIgnoreCase(offsetReset)
+                    && !assignment.isEmpty()
+                    && kafkaConsumer != null) {
+                try {
+                    boolean hasNoCommittedOffset = true;
+                    for (TopicPartition tp : assignment) {
+                        org.apache.kafka.clients.consumer.OffsetAndMetadata committed =
+                                kafkaConsumer.committed(tp);
+                        if (committed != null) {
+                            hasNoCommittedOffset = false;
+                            break;
+                        }
+                    }
+                    if (hasNoCommittedOffset) {
+                        LOG.warn("[SDIA Kafka] ⚠️ NEW GROUP DETECTED — no committed offset found for any partition."
+                                + " auto.offset.reset=latest means messages already in the topic will NOT be read."
+                                + " If you want to read existing messages, change auto.offset.reset to EARLIEST"
+                                + " and redeploy the iFlow."
+                                + " | group.id=" + effectiveGroupId
+                                + " | assignment=" + assignment
+                                + " | hint=Change 'Auto Offset Reset' to EARLIEST in the Processing tab.");
+                    }
+                } catch (Throwable offsetCheckEx) {
+                    // Non-critical — ignore offset check errors
+                }
+            }
+
             LOG.warn("[SDIA Kafka] EMPTY POLL heartbeat group.id=" + effectiveGroupId
                     + " | initialized=" + initialized
+                    + " | auto.offset.reset=" + offsetReset
                     + " | subscription=" + subscription
                     + " | assignment=" + assignment
                     + " | topicPattern=" + endpoint.getTopicPattern());
@@ -2073,6 +2294,8 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
 
     private boolean isNonRetryableCloudConnectorTunnelFailure(final String cause) {
         final String l = lowerSafe(cause);
+
+        // Hard configuration errors — no amount of retrying will fix these without redeploy.
         if (containsAny(l,
                 "address already in use",
                 "local port is already in use",
@@ -2084,26 +2307,86 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 "no valid virtual kafka bootstrap")) {
             return true;
         }
-        // TCP/SOCKS5 startup transport failures are retryable. A temporary CC reconnect,
-        // broker restart or slow SOCKS5 response must not turn the CPI channel into a
-        // silent/zombie adapter instance until manual redeploy.
-        return false;
+
+        // CC/SOCKS5 offline or unreachable at startup.
+        // The tunnel is established once during initialization; if it fails here the
+        // Cloud Connector is down, the virtual mapping is missing, or the SAP CC
+        // location ID is wrong. None of these will self-heal within the same deployed
+        // instance — the operator must fix CC and redeploy. Retrying every 5s just
+        // floods CPI logs with the same error and burns resources.
+        if (containsAny(l,
+                "connection refused",
+                "connection reset",
+                "connect timed out",
+                "read timed out",
+                "timed out",
+                "timeout",
+                "unknownhost",
+                "unresolved",
+                "name or service not known",
+                "no such host",
+                "network unreachable",
+                "socks",
+                "rejected all authentication methods",
+                "authentication failed",
+                "0xff")) {
+            return true;
+        }
+
+        // Any other tunnel failure at startup is also treated as nonRetryable.
+        // A successful tunnel open followed by a mid-consumption drop is handled
+        // separately in the poll() error path with a single reconnect attempt.
+        return true;
     }
 
     private boolean isNonRetryableKafkaStartupFailure(final String cause) {
         final String l = lowerSafe(cause);
+
+        // Authentication and credential errors — wrong password, wrong alias, cert not imported.
+        // None of these self-heal without operator action + redeploy.
         if (containsAny(l,
+                // SASL
                 "sasl authentication failed",
                 "authentication failed",
                 "invalid credentials",
+                "credential alias is empty",
+                "credential alias not found",
+                // SSL / mTLS handshake
                 "ssl handshake failed",
+                "ssl handshake exception",
+                "handshake_failure",
+                // Certificate chain / trust issues — CA not imported, wrong CA alias
                 "pkix path building failed",
                 "unable to find valid certification path",
+                "certificate verify failed",
+                "certificate unknown",
+                "unknown ca",
+                "bad certificate",
+                "certificate expired",
+                "certificate revoked",
+                // Client cert / private key not found in Keystore (alias wrong or not imported)
+                "no such alias",
+                "keystore",
+                "key store",
+                "unrecoverable key",
+                "key management",
+                "no private key",
+                "private key",
+                // Hostname verification
                 "no name matching",
+                "hostname in certificate didn't match",
+                "hostname verification failed",
+                // Authorization
                 "topic authorization failed",
-                "group authorization failed")) {
+                "group authorization failed",
+                "cluster authorization failed",
+                "token endpoint",
+                "invalid_client",
+                "unauthorized_client")) {
             return true;
         }
+
+        // Network/broker transient errors — these can self-heal, allow retry.
         if (containsAny(l,
                 "timeout",
                 "timed out",
@@ -2116,7 +2399,10 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 "metadata")) {
             return false;
         }
-        return false;
+
+        // Default for unknown errors at Kafka startup: non-retryable.
+        // Better to stop and surface than to spam logs with infinite retries.
+        return true;
     }
 
     private boolean isNonRetryableStartupFailure(final String cause) {
@@ -2129,7 +2415,16 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 "group.id resolved to empty",
                 "explicit partitions can only be used",
                 "invalid kafka bootstrap entry",
-                "invalid kafka bootstrap port")) {
+                "invalid kafka bootstrap port",
+                // mTLS config errors
+                "mtlskeyalias",
+                "mtls authentication requires",
+                "connectwithtls",
+                "token endpoint returned http",
+                "token endpoint response did not contain",
+                // Generic bad config
+                "is not configured",
+                "requires 'mtls")) {
             return true;
         }
         return false;
@@ -2304,14 +2599,22 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
     }
 
     private String buildPipelineProcessorError(final ConsumerRecord<String, byte[]> record, final String cause) {
+        final String seekHint = record != null && record.timestamp() >= 0
+                ? "Use TIMESEEK with EpochMs=" + formatKafkaRecordEpochMs(record.timestamp())
+                  + " (ISO: " + formatKafkaRecordTimeUtc(record.timestamp()) + ") to recover this record."
+                : null;
+
+        final String fix = "1. Check the iFlow step that failed after the Sender channel.\n"
+                + "2. Check mapping, content modifier, script or receiver call.\n"
+                + (seekHint != null ? "3. " + seekHint
+                : "3. Enable Message Recovery TIMESEEK to replay this record.");
+
         return buildCompactRuntimeError(
                 "CPI pipeline processing failed",
                 "Event.Smart.Kafka.Record.Processing.Failure",
                 recordContext(record),
                 "The Kafka record reached the iFlow but a downstream processing step failed.",
-                "1. Check the iFlow step that failed after the Sender channel.\n"
-                        + "2. Check mapping, content modifier, script or receiver call.\n"
-                        + "3. Review the configured error handling policy: Stop, Skip or Retry.",
+                fix,
                 safeRoot(cause));
     }
 
@@ -2386,6 +2689,30 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
                 "1. Verify consumer group ACLs and commit permissions.\n"
                         + "2. Check group.id stability, session timeout and max.poll.interval.ms.\n"
                         + "3. The consumer will recycle and retry according to runtime policy.",
+                safeRoot(cause));
+    }
+
+    // Overload com record — exibe timestamp para facilitar TIMESEEK recovery
+    private String buildOffsetCommitFailureError(final ConsumerRecord<String, byte[]> record,
+                                                 final String offsets,
+                                                 final String cause) {
+        if (record == null) {
+            return buildOffsetCommitFailureError(offsets, cause);
+        }
+        final String seekHint = record.timestamp() >= 0
+                ? "Use TIMESEEK EpochMs=" + formatKafkaRecordEpochMs(record.timestamp())
+                  + " (ISO: " + formatKafkaRecordTimeUtc(record.timestamp()) + ") to recover this record."
+                : null;
+        return buildCompactRuntimeError(
+                "Kafka offset commit failed",
+                "Event.Smart.Kafka.Offset.Commit.Failed",
+                recordContext(record)
+                        + "\nOffsets    : " + safeValue(offsets),
+                "The record was processed, but Kafka offset commit failed.",
+                "1. Verify consumer group ACLs and commit permissions.\n"
+                        + "2. Check group.id stability, session timeout and max.poll.interval.ms.\n"
+                        + (seekHint != null ? "3. " + seekHint
+                        : "3. Use Message Recovery TIMESEEK to replay this record."),
                 safeRoot(cause));
     }
 
@@ -2493,16 +2820,25 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
     }
 
     private String describeSecurityProfile() {
-        final boolean tls = Boolean.TRUE.equals(endpoint.getConnectWithTls());
-        if (isPlainTextAuthentication(endpoint.getAuthentication())) {
+        final String authentication = endpoint.getAuthentication();
+        final boolean mtls = endpoint.isMtlsAuthentication(authentication);
+        final boolean tls  = mtls || Boolean.TRUE.equals(endpoint.getConnectWithTls());
+        if (mtls) {
+            return "mTLS / SSL";
+        }
+        if (isPlainTextAuthentication(authentication)) {
             return tls ? "NONE / SSL" : "NONE / PLAINTEXT";
         }
         return "SASL / " + safeValue(endpoint.getSaslMechanism()) + (tls ? " / TLS" : " / no TLS");
     }
 
     private String describeCredentialAlias() {
-        if (isPlainTextAuthentication(endpoint.getAuthentication())) {
+        final String authentication = endpoint.getAuthentication();
+        if (isPlainTextAuthentication(authentication)) {
             return "n/a";
+        }
+        if (endpoint.isMtlsAuthentication(authentication)) {
+            return safeValue(endpoint.getMtlsKeyAlias());
         }
         return safeValue(endpoint.getCredentialAlias());
     }
@@ -2516,14 +2852,18 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
     private String recordContext(final ConsumerRecord<String, byte[]> record) {
         if (record == null) {
             return commonKafkaContext(endpoint.resolveBootstrapServers())
-                    + "\nPartition : <unknown>\nOffset    : <unknown>";
+                    + "\nPartition : <unknown>"
+                    + "\nOffset    : <unknown>"
+                    + "\nTimestamp : <unknown>";
         }
         return "Topic     : " + safeValue(record.topic())
                 + "\nPartition : " + record.partition()
                 + "\nOffset    : " + record.offset()
-                + "\nTime UTC  : " + formatKafkaRecordTimeUtc(record.timestamp())
-                + "\nUnixEpochMs: " + formatKafkaRecordEpochMs(record.timestamp())
-                + "\nBootstrap : " + safeValue(endpoint.resolveBootstrapServers());
+                + "\nTimestamp : " + formatKafkaRecordTimeUtc(record.timestamp())
+                + "\nEpochMs   : " + formatKafkaRecordEpochMs(record.timestamp())
+                + "\nBootstrap : " + safeValue(endpoint.resolveBootstrapServers())
+                + "\nProxy     : " + safeValue(endpoint.getProxyType())
+                + "\nGroup     : " + safeValue(effectiveGroupId);
     }
 
     private String formatKafkaRecordTimeUtc(final long timestampMs) {
@@ -3266,7 +3606,7 @@ public class SdiaKafkaConsumer extends ScheduledPollConsumer {
     }
 
     private void applyOnPremiseClientBootstrapIfRequired(final Properties props,
-                                                        final String kafkaClientBootstrapServers) {
+                                                         final String kafkaClientBootstrapServers) {
         if (!isOnPremiseProxyMode()) {
             return;
         }

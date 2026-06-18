@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
-<ComponentMetadata xmlns:gen="http://www.sap.hci.adk.com/gen" xmlns:bp="http://www.adk.gen/xmlns/blueprint" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" ComponentId="ctype::Adapter/cname::EventSmartKafka/vendor::ricardoviana.opensource/version::1.0.0" ComponentName="EventSmartKafka" UIElementType="Adapter" IsExtension="false" IsFinal="true" IsPreserves="true" IsDefaultGenerator="true" ComponentDisplayName="EventSmartKafka">
-    <Variant VariantName="EventSmartKafka Consumer" VariantId="ctype::AdapterVariant/cname::EventSmartKafka/vendor::ricardoviana.opensource/tp::TCP-SOCKS5/mp::Kafka/direction::Sender" MetadataVersion="2.0" gen:RuntimeComponentBaseUri="EventSmartKafka" AttachmentBehavior="Preserve">
+<ComponentMetadata xmlns:gen="http://www.sap.hci.adk.com/gen" xmlns:bp="http://www.adk.gen/xmlns/blueprint" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" ComponentId="ctype::Adapter/cname::EventSmartKafka/vendor::rhviana.gmail.com/version::1.0.0" ComponentName="EventSmartKafka" UIElementType="Adapter" IsExtension="false" IsFinal="true" IsPreserves="true" IsDefaultGenerator="true" ComponentDisplayName="EventSmartKafka">
+    <Variant VariantName="EventSmartKafka Consumer" VariantId="ctype::AdapterVariant/cname::EventSmartKafka/vendor::rhviana.gmail.com/tp::TCP-SOCKS5/mp::Kafka/direction::Sender/version::1.0.0" MetadataVersion="2.0" gen:RuntimeComponentBaseUri="EventSmartKafka" AttachmentBehavior="Preserve">
         <InputContent Cardinality="1" Scope="outsidepool" MessageCardinality="1" isStreaming="false">
             <Content>
                 <ContentType>Any</ContentType>
@@ -52,11 +52,11 @@
                 </GuiLabels>
                 <AttributeReference>
                     <ReferenceName>authentication</ReferenceName>
-                    <description>Select the Kafka authentication profile. NONE for unauthenticated brokers. SASL for PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512 — with or without TLS.</description>
+                    <description>Select the Kafka authentication profile. NONE for unauthenticated brokers. SASL for PLAIN/SCRAM. mTLS for Mutual TLS client certificate.</description>
                 </AttributeReference>
                 <AttributeReference>
                     <ReferenceName>connectWithTls</ReferenceName>
-                    <description>Enable TLS/SSL encryption for the broker connection. ON = SASL_SSL for SASL. OFF = SASL_PLAINTEXT for SASL without TLS; credential alias is still required.</description>
+                    <description>Enable TLS/SSL encryption for SASL connections. mTLS always uses TLS through the selected client certificate.</description>
                     <EditCondition>
                         <AttributeName>authentication</AttributeName>
                         <AttributeValue>SASL</AttributeValue>
@@ -72,27 +72,51 @@
                 </AttributeReference>
                 <AttributeReference>
                     <ReferenceName>credentialAlias</ReferenceName>
-                    <description>Security Material alias containing Kafka username/password or secure parameters required by the selected authentication profile.</description>
+                    <description>Security Material alias containing Kafka username and password for the selected SASL mechanism.</description>
                     <EditCondition>
                         <AttributeName>authentication</AttributeName>
                         <AttributeValue>SASL</AttributeValue>
+                    </EditCondition>
+                </AttributeReference>
+                <AttributeReference>
+                    <ReferenceName>mtlsKeyAlias</ReferenceName>
+                    <description>CPI Keystore alias for the client key pair (.p12) used in Mutual TLS authentication. Import the .p12 file via Keystore → Add → Key Pair.</description>
+                    <EditCondition>
+                        <AttributeName>authentication</AttributeName>
+                        <AttributeValue>mTLS</AttributeValue>
                     </EditCondition>
                 </AttributeReference>
                 <AttributeReference>
                     <ReferenceName>brokerCaSource</ReferenceName>
-                    <description>Controls whether the adapter uses the JVM/system public CA trust store or a custom private CA certificate alias from the CPI Keystore. Required when TLS is enabled with a private CA.</description>
-                    <EditCondition>
-                        <AttributeName>authentication</AttributeName>
-                        <AttributeValue>SASL</AttributeValue>
-                    </EditCondition>
+                    <description>Broker CA trust source. Leave as None for public CA brokers. Use Custom only when Connect with TLS is enabled.</description>
+                    <AndCondition>
+                        <EditCondition>
+                            <AttributeName>connectWithTls</AttributeName>
+                            <AttributeValue>true</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>authentication</AttributeName>
+                            <AttributeValue>SASL</AttributeValue>
+                        </EditCondition>
+                    </AndCondition>
                 </AttributeReference>
                 <AttributeReference>
                     <ReferenceName>certificateAlias</ReferenceName>
-                    <description>CPI Keystore alias for the custom broker CA certificate. Required only when Broker CA = Custom.</description>
-                    <EditCondition>
-                        <AttributeName>brokerCaSource</AttributeName>
-                        <AttributeValue>Custom</AttributeValue>
-                    </EditCondition>
+                    <description>CPI Keystore alias for the custom broker CA certificate. Required only when SASL_SSL uses Broker CA = Custom.</description>
+                    <AndCondition>
+                        <EditCondition>
+                            <AttributeName>authentication</AttributeName>
+                            <AttributeValue>SASL</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>connectWithTls</AttributeName>
+                            <AttributeValue>true</AttributeValue>
+                        </EditCondition>
+                        <EditCondition>
+                            <AttributeName>brokerCaSource</AttributeName>
+                            <AttributeValue>Custom</AttributeValue>
+                        </EditCondition>
+                    </AndCondition>
                 </AttributeReference>
             </AttributeGroup>
         </Tab>
@@ -444,13 +468,19 @@
             <FixedValue>
                 <Value>None</Value>
                 <GuiLabels guid="b31fdcdb-d366-4415-a0a2-62413d87bc90">
-                    <Label language="EN"> 🚫 NONE | Plain Text</Label>
+                    <Label language="EN"> 🚫 NONE | PlainText </Label>
                 </GuiLabels>
             </FixedValue>
             <FixedValue>
                 <Value>SASL</Value>
                 <GuiLabels guid="a12fdcdb-d366-4415-a0a2-62413d87bc94">
-                    <Label language="EN"> 🛡️ SASL Basic </Label>
+                    <Label language="EN"> 🛡️ SALS | Basic </Label>
+                </GuiLabels>
+            </FixedValue>
+            <FixedValue>
+                <Value>mTLS</Value>
+                <GuiLabels guid="d34fdcdb-d366-4415-a0a2-62413d87bc96">
+                    <Label language="EN"> 🔐 mTLS | Client Certificate</Label>
                 </GuiLabels>
             </FixedValue>
         </FixedValues>
@@ -468,7 +498,7 @@
     </AttributeMetadata>
     <AttributeMetadata>
         <Name>saslMechanism</Name>
-        <Usage>false</Usage>
+        <Usage>true</Usage>
         <DataType>xsd:string</DataType>
         <Default>PLAIN</Default>
         <Length/>
@@ -499,7 +529,7 @@
     </AttributeMetadata>
     <AttributeMetadata>
         <Name>credentialAlias</Name>
-        <Usage>false</Usage>
+        <Usage>true</Usage>
         <DataType>xsd:string</DataType>
         <Default/>
         <Length/>
@@ -510,7 +540,7 @@
     </AttributeMetadata>
     <AttributeMetadata>
         <Name>brokerCaSource</Name>
-        <Usage>false</Usage>
+        <Usage>true</Usage>
         <DataType>xsd:string</DataType>
         <Default>None</Default>
         <Length/>
@@ -522,26 +552,37 @@
             <FixedValue>
                 <Value>None</Value>
                 <GuiLabels guid="b1c2d3e4-f5a6-47b8-9c0d-1e2f3a4b5c61">
-                    <Label language="EN"> 🚫 None  —  Public CA (JVM Trust Store)</Label>
+                    <Label language="EN"> 🚫 NONE | Public CA </Label>
                 </GuiLabels>
             </FixedValue>
             <FixedValue>
                 <Value>Custom</Value>
                 <GuiLabels guid="b1c2d3e4-f5a6-47b8-9c0d-1e2f3a4b5c62">
-                    <Label language="EN"> 📜 Custom — Private CA from CPI Keystore</Label>
+                    <Label language="EN"> 📜 CUSTOM | Private CA </Label>
                 </GuiLabels>
             </FixedValue>
         </FixedValues>
     </AttributeMetadata>
     <AttributeMetadata>
         <Name>certificateAlias</Name>
-        <Usage>false</Usage>
+        <Usage>true</Usage>
         <DataType>xsd:string</DataType>
         <Default/>
         <Length/>
         <isparameterized>true</isparameterized>
         <GuiLabels guid="37c257c5-1ff1-4117-a81d-3c746a5f3d26">
             <Label language="EN">CA Certificate (Keystore alias)</Label>
+        </GuiLabels>
+    </AttributeMetadata>
+    <AttributeMetadata>
+        <Name>mtlsKeyAlias</Name>
+        <Usage>true</Usage>
+        <DataType>xsd:string</DataType>
+        <Default/>
+        <Length/>
+        <isparameterized>true</isparameterized>
+        <GuiLabels guid="j90ldcdb-d366-4415-a0a2-62413d87bca4">
+            <Label language="EN">Client Key Alias (Keystore)</Label>
         </GuiLabels>
     </AttributeMetadata>
     <AttributeMetadata>
@@ -580,13 +621,13 @@
             <FixedValue>
                 <Value>Automatic Assignment</Value>
                 <GuiLabels guid="2f41a3cc-41f4-4a35-91ea-7bdbdb570002">
-                    <Label language="EN"> 🤝 Automatic Assignment</Label>
+                    <Label language="EN"> 🤝 Automatic Assignment </Label>
                 </GuiLabels>
             </FixedValue>
             <FixedValue>
                 <Value>Explicit Partition(s)</Value>
                 <GuiLabels guid="2f41a3cc-41f4-4a35-91ea-7bdbdb570003">
-                    <Label language="EN"> 🎯 Explicit Partition(s)</Label>
+                    <Label language="EN"> 🎯 Explicit Partition(s) </Label>
                 </GuiLabels>
             </FixedValue>
         </FixedValues>
@@ -632,7 +673,7 @@
             </FixedValue>
             <FixedValue>
                 <Value>Retry Failed Message</Value>
-                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc0664">
+                <GuiLabels guid="2fcf8ed8-ad67-40c8-9942-8e9ce3dc0644">
                     <Label language="EN"> 🔁 Retry Failed Message</Label>
                 </GuiLabels>
             </FixedValue>
@@ -769,7 +810,7 @@
         <Name>maxPollRecords</Name>
         <Usage>true</Usage>
         <DataType>xsd:integer</DataType>
-        <Default>500</Default>
+        <Default>50</Default>
         <Length/>
         <isparameterized>true</isparameterized>
         <GuiLabels guid="65380b7b-2695-4431-8d15-1e8ca32ef9a8">
@@ -846,7 +887,7 @@
         <Name>maxPollIntervalMs</Name>
         <Usage>false</Usage>
         <DataType>xsd:integer</DataType>
-        <Default>60000</Default>
+        <Default>300000</Default>
         <Length/>
         <isparameterized>false</isparameterized>
         <GuiLabels guid="8a9b0c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d">
@@ -855,7 +896,7 @@
     </AttributeMetadata>
     <AttributeMetadata>
         <Name>maxPayloadConversionSize</Name>
-        <Usage>false</Usage>
+        <Usage>true</Usage>
         <DataType>xsd:string</DataType>
         <Default>1</Default>
         <Length/>
@@ -1009,13 +1050,13 @@
             <FixedValue>
                 <Value>Disabled</Value>
                 <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9011">
-                    <Label language="EN"> 🚫 Disabled</Label>
+                    <Label language="EN"> 🚫 Disabled </Label>
                 </GuiLabels>
             </FixedValue>
             <FixedValue>
                 <Value>Seek by Timestamp</Value>
                 <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9012">
-                    <Label language="EN"> ⏱️ Seek by Timestamp</Label>
+                    <Label language="EN"> ⏱️ Seek by Timestamp </Label>
                 </GuiLabels>
             </FixedValue>
         </FixedValues>
@@ -1082,13 +1123,13 @@
             <FixedValue>
                 <Value>Read only first matched message</Value>
                 <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9041">
-                    <Label language="EN"> 📍 Read only first matched message.</Label>
+                    <Label language="EN"> 📍 Read only first matched message</Label>
                 </GuiLabels>
             </FixedValue>
             <FixedValue>
                 <Value>Continue from timestamp</Value>
                 <GuiLabels guid="91f6aaf4-8b95-4f93-8ac5-1f0c4d8e9042">
-                    <Label language="EN"> ▶️ Continue from timestamp.</Label>
+                    <Label language="EN"> ▶️ Continue from timestamp</Label>
                 </GuiLabels>
             </FixedValue>
         </FixedValues>
@@ -1118,7 +1159,7 @@
             <FixedValue>
                 <Value>None</Value>
                 <GuiLabels guid="f1e2d3c4-b5a6-9870-fedc-ba9876543210">
-                    <Label language="EN"> 🚫 None 🔀 Max 20 MB</Label>
+                    <Label language="EN"> 🚫 NONE 🔀 Max 20 MB</Label>
                 </GuiLabels>
             </FixedValue>
             <FixedValue>
@@ -1130,7 +1171,7 @@
             <FixedValue>
                 <Value>XML</Value>
                 <GuiLabels guid="5832fa14-33ea-475e-a605-a7bf333c7092">
-                    <Label language="EN"> 🦅 AVRO  🔄  XML 🔖 </Label>
+                    <Label language="EN"> 🦅 AVRO 🔄 XML 🔖 </Label>
                 </GuiLabels>
             </FixedValue>
         </FixedValues>

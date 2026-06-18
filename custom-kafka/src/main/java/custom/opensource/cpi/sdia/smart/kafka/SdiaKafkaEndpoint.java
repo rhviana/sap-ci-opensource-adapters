@@ -57,7 +57,7 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
     private String authentication = "SASL";
 
     @UriParam
-    private Boolean connectWithTls = Boolean.TRUE;
+    private Boolean connectWithTls = Boolean.FALSE;
 
     @UriParam
     private String saslMechanism = "PLAIN";
@@ -110,10 +110,10 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
     private Long sessionTimeoutS = 10L;
 
     @UriParam
-    private Integer maxPollIntervalMs = 60000; // internal default: avoid 5-minute zombie waits during CPI redeploy/rebalance
+    private Integer maxPollIntervalMs = 300000; // Kafka default; allows bounded adapter retry without max.poll.interval rebalance
 
     @UriParam
-    private String errorHandling = "Stop on Error";
+    private String errorHandling = "Skip Failed Message";
 
     @UriParam
     private Integer retryAttempts = 5;
@@ -182,30 +182,21 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
     private Long delayS = 1L;
 
     @UriParam
-    private Integer maxPollRecords = 10;
+    private Integer maxPollRecords = 50;
 
     @UriParam
     private String groupId;
 
     @UriParam
-    private String autoOffsetReset = "earliest";
+    private String autoOffsetReset = "latest";
+
+
+
+
+
 
     @UriParam
-    /** @deprecated OAuth removed in v2.0 — use SASL PLAIN or SCRAM. */
-    @Deprecated private String oauthTokenEndpoint;
-
-    @UriParam
-    @Deprecated private String oauthClientId;
-
-    @UriParam
-    @Deprecated private String oauthClientSecretAlias;
-
-    @UriParam
-    @Deprecated private String oauthScope;
-
-    @UriParam
-    /** @deprecated mTLS removed in v2.0 — use SASL PLAIN or SCRAM. */
-    @Deprecated private String mtlsKeyAlias;
+    private String mtlsKeyAlias;
 
     @UriParam
     private String seekToTimestamp;
@@ -262,9 +253,23 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
 
     @Override
     public Consumer createConsumer(final Processor processor) throws Exception {
-        SdiaKafkaConsumer consumer = new SdiaKafkaConsumer(this, processor);
-        configureConsumer(consumer);
-        return consumer;
+        final int parallel = parallelConsumers != null && parallelConsumers > 1
+                ? parallelConsumers
+                : 1;
+
+        if (parallel == 1) {
+            // Single consumer — standard path, no overhead
+            SdiaKafkaConsumer consumer = new SdiaKafkaConsumer(this, processor);
+            configureConsumer(consumer);
+            return consumer;
+        }
+
+        // Parallel consumers — N instances sharing same group.id.
+        // Kafka distributes partitions among them via group rebalance.
+        // Effective parallelism is bounded by number of topic partitions.
+        SdiaKafkaMultiConsumer multi = new SdiaKafkaMultiConsumer(this, processor, parallel);
+        configureConsumer(multi);
+        return multi;
     }
 
     @Override
@@ -509,8 +514,7 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
      *
      * Covers the currently supported runtime paths:
      *   - Transport / discovery: resolvable bootstrap servers + a topic pattern.
-     *   - Security: SASL over TLS (SASL_SSL) with Basic credentials (username/password
-     *     supplied through credentialAlias); OAuth bearer is also accepted.
+     *   - Security: SASL (PLAIN/SCRAM), or mTLS.
      *   - Conversion: Avro via Schema Registry, using either "Fixed Schema ID"
      *     or "Magic Byte" schema-id resolution.
      */
@@ -529,42 +533,42 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
 
         // --- Security ------------------------------------------------------
         validateSecurity();
+        validateBrokerCaConfiguration();
 
         // --- Avro conversion + Schema Registry -----------------------------
         validateConversion();
     }
 
     /**
-     * Validates the security configuration. Default authentication is SASL.
-     * For SASL/Basic the credentialAlias (username/password) is mandatory and the
-     * mechanism must be one of PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512. For OAuth the
-     * token endpoint and client id are mandatory.
+     * Validates the security configuration.
+     *
+     * Supported authentication profiles:
+     *   - NONE              : unauthenticated broker (PLAINTEXT only in the simplified UI).
+     *   - SASL              : PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512 with credentialAlias.
+     *   - mTLS              : Mutual TLS — client certificate from CPI Keystore via mtlsKeyAlias.
+     *                         TLS is forced by the runtime; no SASL credential required.
      */
     private void validateSecurity() {
         final String auth = trimToNull(authentication);
 
-        // NONE / Plain Text path: no credentials, no TLS material, no SASL validation.
-        // This is required for On-Premise/Cloud Connector/ngrok PLAINTEXT tests.
+        // NONE — no credentials; PLAINTEXT only in the simplified UI.
         if (isPlainTextAuthentication(auth)) {
             return;
         }
 
-        // OAuth bearer path
-        if (auth != null && "OAuth".equalsIgnoreCase(auth)) {
-            if (trimToNull(oauthTokenEndpoint) == null) {
+
+        // mTLS path — client cert from CPI Keystore. TLS is forced by the runtime
+        // regardless of any stale hidden connectWithTls value persisted by older metadata.
+        if (isMtlsAuthentication(auth)) {
+            if (trimToNull(mtlsKeyAlias) == null) {
                 throw new IllegalArgumentException(
-                        "[SDIA Kafka] OAuth authentication requires 'oauthTokenEndpoint'.");
-            }
-            if (trimToNull(oauthClientId) == null) {
-                throw new IllegalArgumentException(
-                        "[SDIA Kafka] OAuth authentication requires 'oauthClientId'.");
+                        "[SDIA Kafka] mTLS authentication requires 'mtlsKeyAlias' "
+                                + "(CPI Keystore alias for the client private key and certificate chain).");
             }
             return;
         }
 
-        // SASL path (default when authentication is null/blank or any SASL profile is selected).
-        // TLS is controlled independently by connectWithTls. Therefore both SASL_SSL
-        // and SASL_PLAINTEXT require credentialAlias and the same mechanism validation.
+        // SASL path — PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512.
         final boolean sasl = isSaslAuthentication(auth);
         if (sasl) {
             if (trimToNull(credentialAlias) == null) {
@@ -582,7 +586,31 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
                                 + "'. Use PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512.");
             }
         }
-        // For non-SASL/non-OAuth (plain SSL / mTLS) no extra credential is required here.
+    }
+
+    private void validateBrokerCaConfiguration() {
+        // Broker CA is intentionally limited to SASL_SSL in the UI.
+        // For mTLS the adapter uses only mtlsKeyAlias (.p12/key pair); stale Broker CA
+        // values persisted by older metadata must not make mTLS fail validation.
+        if (!isSaslAuthentication(authentication) || !isEffectiveSaslTlsEnabled()) {
+            return;
+        }
+
+        final String caSource = trimToNull(brokerCaSource);
+        if (caSource == null) {
+            return;
+        }
+        final String normalized = normalizeAuthenticationToken(caSource);
+        if (normalized != null && normalized.indexOf("custom") >= 0
+                && trimToNull(certificateAlias) == null) {
+            throw new IllegalArgumentException(
+                    "[SDIA Kafka] Broker CA = Custom is valid only for SASL_SSL and requires 'certificateAlias' "
+                            + "to point to the CPI Keystore certificate alias containing the broker/root CA.");
+        }
+    }
+
+    private boolean isEffectiveSaslTlsEnabled() {
+        return connectWithTls != null && connectWithTls.booleanValue();
     }
 
     /**
@@ -645,14 +673,25 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
         return normalized == null || normalized.indexOf("sasl") >= 0;
     }
 
+
+    public boolean isMtlsAuthentication(final String auth) {
+        final String normalized = normalizeAuthenticationToken(auth);
+        if (normalized == null) return false;
+        return normalized.indexOf("mtls") >= 0
+                || (normalized.indexOf("mutual") >= 0 && normalized.indexOf("tls") >= 0)
+                || normalized.indexOf("client cert") >= 0
+                || normalized.indexOf("client certificate") >= 0;
+    }
+
     private boolean isPlainTextAuthentication(final String auth) {
         final String normalized = normalizeAuthenticationToken(auth);
         if (normalized == null) {
             return false;
         }
 
-        // Accept the persisted value and the visible UI label variants.
-        // NONE | Plain Text means: no SASL, no TLS, no CPI User Credential lookup.
+        // Accept the persisted value and visible UI label variants.
+        // NONE means: no SASL and no CPI User Credential lookup.
+        // It does not force PLAINTEXT; connectWithTls decides SSL vs PLAINTEXT.
         return "none".equals(normalized)
                 || "plaintext".equals(normalized)
                 || "plain text".equals(normalized)
@@ -715,8 +754,15 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
     public String getAuthentication() { return authentication; }
     public void setAuthentication(String v) { this.authentication = v; }
 
-    public Boolean getConnectWithTls() { return connectWithTls; }
-    public void setConnectWithTls(Boolean v) { this.connectWithTls = v != null ? v : Boolean.TRUE; }
+    public Boolean getConnectWithTls() {
+        // mTLS is TLS-only in the simplified UI. This protects old
+        // channels where a hidden connectWithTls=false value may still be persisted.
+        if (isMtlsAuthentication(authentication)) {
+            return Boolean.TRUE;
+        }
+        return connectWithTls;
+    }
+    public void setConnectWithTls(Boolean v) { this.connectWithTls = v != null ? v : Boolean.FALSE; }
 
     public String getSaslMechanism() { return saslMechanism; }
     public void setSaslMechanism(String v) { this.saslMechanism = v; }
@@ -813,15 +859,15 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
 
     public Integer getMaxPollIntervalMs() { return maxPollIntervalMs; }
     public void setMaxPollIntervalMs(Integer v) {
-        int value = positiveOrDefault(v, 60000);
+        int value = positiveOrDefault(v, 300000);
         if (value < 10000) value = 10000;
-        if (value > 60000) value = 60000;
+        if (value > 300000) value = 300000;
         this.maxPollIntervalMs = value;
     }
     public void setMaxPollIntervalMs(String v) { setMaxPollIntervalMs(parseInteger(v)); }
 
     public String getErrorHandling() { return errorHandling; }
-    public void setErrorHandling(String v) { this.errorHandling = (v == null || v.isEmpty()) ? "Stop on Error" : v; }
+    public void setErrorHandling(String v) { this.errorHandling = (v == null || v.isEmpty()) ? "Skip Failed Message" : v; }
 
     public Integer getRetryAttempts() { return retryAttempts; }
     public void setRetryAttempts(Integer v) {
@@ -1005,17 +1051,10 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
     public String getKafkaPortRow() { return kafkaPortRow; }
     public void setKafkaPortRow(String v) { this.kafkaPortRow = v; this.resolvedBootstrapServersCache = null; }
 
-    public String getOauthTokenEndpoint() { return oauthTokenEndpoint; }
-    public void setOauthTokenEndpoint(String v) { this.oauthTokenEndpoint = v; }
 
-    public String getOauthClientId() { return oauthClientId; }
-    public void setOauthClientId(String v) { this.oauthClientId = v; }
 
-    public String getOauthClientSecretAlias() { return oauthClientSecretAlias; }
-    public void setOauthClientSecretAlias(String v) { this.oauthClientSecretAlias = v; }
 
-    public String getOauthScope() { return oauthScope; }
-    public void setOauthScope(String v) { this.oauthScope = v; }
+
 
     public String getMtlsKeyAlias() { return mtlsKeyAlias; }
     public void setMtlsKeyAlias(String v) { this.mtlsKeyAlias = v; }
@@ -1183,8 +1222,8 @@ public class SdiaKafkaEndpoint extends DefaultPollingEndpoint {
     }
 
     private static int normalizeMaxPollRecords(final Integer value) {
-        final int records = value == null ? 10 : value.intValue();
-        if (records < 1) return 1;
+        final int records = value == null ? 50 : value.intValue();
+        if (records < 1)   return 1;
         if (records > 500) return 500;
         return records;
     }

@@ -170,13 +170,24 @@ public class KafkaConsumerFactory {
 
     private void applySecurity(final SdiaKafkaEndpoint endpoint, final Properties props) {
         final String authentication = endpoint.getAuthentication();
+        final boolean tls = resolveTlsEnabled(endpoint, authentication);
 
+
+        // mTLS — Mutual TLS: client certificate + private key from CPI Keystore.
+        // No SASL layer. The broker authenticates the client via the presented certificate.
+        if (endpoint.isMtlsAuthentication(authentication)) {
+            props.put("security.protocol", "SSL");
+            SdiaKafkaSslConfigurator.applySslMaterial(endpoint, props, true);
+            return;
+        }
+
+        // NONE — no SASL/client certificate. In the simplified v1.5 UI,
+        // Authentication=None is strictly PLAINTEXT. This prevents stale hidden
+        // connectWithTls=true values from sending TLS ClientHello to PLAINTEXT listeners.
         if (isPlainTextAuthentication(authentication)) {
             props.put("security.protocol", "PLAINTEXT");
             return;
         }
-
-        final boolean tls = resolveTlsEnabled(endpoint, authentication);
 
         final boolean sasl = isSaslAuthentication(authentication);
 
@@ -201,9 +212,9 @@ public class KafkaConsumerFactory {
             return false;
         }
 
-        // CPI can persist the fixed value ("None") or the UI label variants such as
-        // "NONE | Plain Text" after adapter metadata refreshes. In all of these cases
-        // the Kafka client must be pure PLAINTEXT and must not load User Credentials.
+        // CPI can persist the fixed value ("None") or UI label variants.
+        // This means "no SASL/user credential". It does NOT force PLAINTEXT;
+        // TLS is decided by connectWithTls only for SASL. NONE is PLAINTEXT; mTLS always forces TLS.
         return "none".equals(normalized)
                 || "plaintext".equals(normalized)
                 || "plain text".equals(normalized)
@@ -220,10 +231,15 @@ public class KafkaConsumerFactory {
     private boolean resolveTlsEnabled(final SdiaKafkaEndpoint endpoint, final String authentication) {
         final String normalized = normalizeAuthenticationToken(authentication);
 
-        // Explicit profile support for future metadata values such as
-        // SASL_PLAINTEXT, SASL | Plain Text, or SASL without TLS.
+        // mTLS is TLS-only. Ignore stale hidden
+        // connectWithTls=false values persisted by older adapter metadata.
+        if (endpoint != null && (endpoint.isMtlsAuthentication(authentication))) {
+            return true;
+        }
+
+        // Explicit profile support for metadata values such as SASL_PLAINTEXT,
+        // "NONE | Plain Text", "no TLS" or "without TLS".
         if (normalized != null
-                && normalized.indexOf("sasl") >= 0
                 && (normalized.indexOf("plaintext") >= 0
                     || normalized.indexOf("plain text") >= 0
                     || normalized.indexOf("no tls") >= 0
@@ -231,7 +247,7 @@ public class KafkaConsumerFactory {
             return false;
         }
 
-        return endpoint.getConnectWithTls() == null || endpoint.getConnectWithTls().booleanValue();
+        return endpoint != null && Boolean.TRUE.equals(endpoint.getConnectWithTls());
     }
 
     private String normalizeAuthenticationToken(final String value) {
@@ -305,6 +321,8 @@ public class KafkaConsumerFactory {
 
         return jaas.toString();
     }
+
+
 
     /**
      * Otimização: Escreve os caracteres de escape diretamente no StringBuilder principal,

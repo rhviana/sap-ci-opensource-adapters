@@ -1,66 +1,91 @@
-## v3.0.0 — Ricardoviana Runtime Guard
+# Changelog — EventSmartKafka
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-v1.1.0%20Consumer%20Final-green.svg)](#)
+[![SAP CPI](https://img.shields.io/badge/SAP%20CPI-Custom%20Adapter-0A6ED1.svg)](#)
+[![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-Consumer-black.svg)](#)
+[![SAP Cloud Connector](https://img.shields.io/badge/SAP%20Cloud%20Connector-TCP%2FSOCKS5-1f77b4.svg)](#)
+[![Java](https://img.shields.io/badge/Java-8%20bytecode-red.svg)](#)
 
-- Aligned ADK metadata/config/POM version to 3.0.0 and vendor to ricardoviana.opensource.
-- Kept Consumer-only runtime and existing consumer diagnostic messages.
-- Hardened Cloud Connector relay thread scheduling and socket limits.
-- Added XML table positional-cell fallback for bootstrap host/port parsing.
-- Wired Schema Registry connect/read timeout metadata into the HTTP client.
-- Preserved CPI-safe Camel 3.14 default; added Camel 4.4 lab profile only.
+All notable changes to **EventSmartKafka** are documented here.
 
+---
 
-## v2.0.3 — Avro Schema/Payload Guard Hotfix
+## v1.1.0 — Consumer Final Release
 
-- Added Magic Byte expected Schema ID guard: when schemaRegistrySchemaId is filled in Magic Byte mode, the adapter verifies the payload wire header Schema ID matches it.
-- Added empty conversion guard: Avro conversion cannot pass a blank body silently.
-- Raised effective Kafka fetch floor while Avro conversion is enabled so oversized records can be fetched and rejected visibly instead of producing empty polls.
-- Broadened Avro RuntimeCamelException detection so adapter-generated Avro failures do not get reclassified as generic pipeline failures.
+> **This is the final release for the Consumer/Sender side.**
+> No further updates, bug fixes, enhancements or support will be provided for this module.
+> This project is open source and provided AS IS under Apache License 2.0.
+> Next: Producer/Receiver adapter.
 
-# Changelog
+### Stress Validation
 
-## v2.0.1 — Critical bootstrap resolver fix
+3,000,000 messages delivered across 23 topics and 4 listeners on SAP BTP Trial.
+4 simultaneous tunnels — Cloud Connector SOCKS5 + OSGi Relay — zero failures in 27 minutes.
+Avro payloads: 53 B · 1 MB · 2 MB.
+
+### Added
+
+- **Parallel Consumers** — N consumer instances sharing same `group.id`. Kafka distributes partitions automatically via group rebalance.
+- **Parallel + Partition conflict detection** — fail-fast with clear error when `parallelConsumers > 1` combined with explicit partition. Prevents misconfiguration silently ignored by previous versions.
+- **New group + LATEST warning** — when consumer group has no committed offsets and `auto.offset.reset=LATEST`, adapter logs a clear warning per empty poll cycle so operator knows to switch to EARLIEST.
+- **Zombie state log** — when `stoppedByErrorPolicy=true`, adapter logs every 60s that it is stopped and requires undeploy/redeploy to resume. No more silent dead adapters.
+- **TIMESEEK read-all-from-timestamp** — fixed via `ConsumerRebalanceListener.onPartitionsAssigned`. Consumer stays in subscribe() group; commits work normally. Previous implementation used unsubscribe/assign which caused group rebalance and commit failures.
+- **TIMESEEK single-record restore fix** — skips `commitSync` restore when in `assign` mode. Previous implementation tried to restore original offset after group had already rebalanced, causing `group has already rebalanced` error on every recovery.
+- **Timestamp in all record errors** — `recordContext()` now includes `Timestamp`, `EpochMs`, `Proxy` and `Group`. Error messages include TIMESEEK hint with the exact EpochMs needed to recover the failed record.
+- **`max.poll.records` default changed** from 500 to 50. Cap remains 500.
 
 ### Fixed
-- **CRITICAL**: `resolveBootstrapServers()` failed to parse `kafkaClusterHostsTable` when the SAP ADK runtime serialized table rows as `<row index="0">` or `<row id="...">` (with attributes) instead of bare `<row>`. The old parser used `indexOf("<row>", ...)` which never matched tags with attributes, silently returning `null` and producing `Event.Smart.Kafka.Config.Broker.Resolve.Failed` even when the host/port table was filled in correctly in the CPI UI. The parser now searches for `<row` (without the closing `>`) so any attributes on the tag no longer break detection.
-- **CRITICAL**: `normalizeSchemaCacheKb()` clamped to `50/100/250` KB — leftover from a previous metadata version. Current metadata only allows `5/10/15` KB; this mismatch meant the runtime schema cache size never matched what the user selected in the UI. Now clamps to `5/10/15` KB matching `schemaIdBufferSize` FixedValues.
-- **CRITICAL**: `normalizePayloadMb()` clamped to `1/3/5` MB — leftover from a previous metadata version. Current metadata only allows `1/2` MB MAX; selecting `2` MB silently promoted to `3` MB at runtime. Now clamps to `1/2` MB matching `maxPayloadConversionSize` FixedValues.
-- `schemaIdBufferSize` Java field default was `"50"`, inconsistent with the `5/10/15` KB FixedValues — same root cause class as the metadata.xml `<Default>50</Default>` bug fixed earlier. Now defaults to `"5"`.
-- `extractXmlCellValue()` had the same attribute-intolerance bug as the row scanner — hardened to always locate the opening tag's closing `>` before reading cell content, regardless of extra attributes.
-- Added a JSON fallback path that finds the first `{` or `[` anywhere in the string (not just at index 0), accepting bare single-object serializations some ADK runtime versions emit for single-row tables.
-- Added a plain-text `host:port` fallback for ADK runtime versions that serialize a single-row table as a flat string with no XML/JSON wrapper.
-- When no known format matches, the resolver now logs a `WARN` with the raw value length and an 80-character preview instead of failing silently — diagnosable directly from CPI trace logs.
 
-### Verified (no bug found)
-- Avro payload conversion limit confirmed at 1 MB / 2 MB MAX (`maxPayloadConversionSize`).
-- Schema Registry cache size limit confirmed at 5 / 10 / 15 KB MAX (`schemaIdBufferSize`), now actually enforced after the fix above.
-- Fetch size limit confirmed at 1–20 MB (`maxFetchSize`) — governs raw Kafka record fetch size, independent from the Avro conversion limit.
-- "Fixed Schema ID" mode without a configured schema ID throws a clear `IllegalArgumentException` both at channel validation time and at conversion time. No silent failure or `NullPointerException` path found.
+- **OSGi Relay port lock on redeploy** — relay lifecycle now bound to OSGi bundle, not classloader. Clean redeploy every time, no restart required.
+- **Infinite retry loops** — fatal startup errors (invalid broker, wrong credentials, missing keystore, wrong topic, SOCKS5 failure) now apply strict no-retry policy. Stops, logs root cause, waits for redeploy.
+- **SOCKS5 tunnel bug** — `fatalInitFailure` not set on tunnel failure caused silent infinite loop. Fixed.
+- **Wrong defaults** — `autoOffsetReset` earliest→latest, `errorHandling` Stop→Skip, `maxPollRecords` 10→500→50.
+- **UI metadata conditional fields** — `brokerCaSource` only for SASL+TLS, `certificateAlias` only for SASL+TLS+Custom, `connectWithTls` only for SASL. mTLS and OAuth show only their specific fields.
+- **mTLS ignores stale `connectWithTls=false`** — mTLS always resolves as SSL regardless of hidden persisted values.
+- **NONE+TLS now maps to SSL** — previously forced PLAINTEXT. `Authentication=NONE + Connect with TLS=true` now correctly uses `security.protocol=SSL`.
 
-## v2.0.0
+### Removed
 
-### Breaking changes
-- **Consumer-only** — `KafkaProducerFactory` and `SdiaKafkaProducer` removed. Producer will be released separately.
-- **Authentication** — mTLS (`Client Certificate`) and OAuth 2.0 removed. Supported: `NONE` and `SASL` (PLAIN · SCRAM-SHA-256 · SCRAM-SHA-512).
-- **Port field** — `kafkaPortRow` changed from `xsd:integer` to `xsd:string`. CPI external parameters can now bind to the port field.
-- **Retry** — options reduced to `5` (default) and `10` (maximum). Values 6–9 removed from metadata.
-- **Payload limits** — Avro conversion capped at 1 MB / 2 MB MAX. Schema size capped at 5 / 10 / 15 KB MAX.
-- **Dependencies** — `compile-libs/` folder and all local `scope=system` JARs removed. All dependencies now resolve from Maven Central.
+- OAuth2 / OAUTHBEARER — removed from UI and code. No cloud provider offers OAuth2 Kafka at free tier. Implementation reserved for future paid-plan scenarios.
 
-### New
-- SAP ADK upgraded to `2.27.0` (from `2.25.0`).
-- Kafka clients upgraded to `3.6.2` (from `3.4.0`).
-- `adapter.api` added as explicit Maven Central dependency.
-- Schema Registry cache upgraded to **1-hour TTL** with `CacheEntry` expiry tracking and smart eviction (expired-first before full clear). Cache capacity increased to 512 entries.
-- Schema Registry HTTP: `Connection: keep-alive`, `Accept-Encoding: gzip`, buffer 8 KB (was 2 KB), connect timeout 3 s (was 5 s), read timeout 8 s (was 10 s).
-- OAuth `applyOAuth` method removed from `KafkaConsumerFactory`.
-- All development/debug `.txt` and `.md` notes removed from repository.
+---
 
-## v1.0.0
+## v1.0.0-RC1 — Public Technical Preview
 
-- Initial release: Consumer adapter with NONE, SASL, mTLS, OAuth profiles.
-- SAP Cloud Connector TCP/SOCKS5 tunnel with SAP JWT method 0x80 and RFC1929 fallback.
-- Avro conversion: Magic Byte and Fixed Schema ID modes.
-- Offset control: Earliest, Latest, None, Seek by Timestamp, Message Recovery.
-- Error handling: Skip, Stop on Error, Retry (5–10 attempts).
-- Poison Pill skip with silent commit.
-- Validated: 498,516 messages, 0 failures, 0 retries across 20 iFlows and 3 CC tunnels simultaneously.
+### Status
+
+Public demo release. SAP Community study case. Apache License 2.0. Provided AS IS. No SAP certification. No production SLA.
+
+### Added
+
+- Kafka Consumer Sender Adapter for SAP Cloud Integration.
+- SAP ADK-based custom adapter packaging.
+- Cloud Kafka support.
+- On-Premise Kafka through SAP Cloud Connector TCP/SOCKS5.
+- Security profiles: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL.
+- SASL mechanisms: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512.
+- TLS trust source: JVM default truststore, CPI keystore alias.
+- Avro conversion: Magic Byte / Confluent Wire Format, Fixed Schema ID, Avro to JSON, Avro to XML.
+- Schema Registry lookup and cache.
+- Offset reset policies: EARLIEST, LATEST, NONE.
+- Error handling: Stop on Error, Skip Failed Message, Retry Failed Message.
+- TIMESEEK recovery by timestamp.
+- Single Message Recovery mode.
+- Runtime diagnostic headers (`x-sdiakafka-*`).
+- Structured error messages with code, context, root cause and fix steps.
+- Offset Commit Timeout configurable parameter.
+
+### Validation
+
+- 1.5M+ messages across stress scenarios.
+- Multiple CPI iFlows, multiple topics, multiple security profiles.
+- Three On-Premise TCP/SOCKS5 relay paths.
+- Avro payloads: small, 1 MB and 2 MB messages.
+
+### Known Limitations at RC1
+
+- mTLS not included.
+- OAuth/OAUTHBEARER not included.
+- Producer/Receiver role not included (roadmap).
+- DLQ publishing not included (roadmap).

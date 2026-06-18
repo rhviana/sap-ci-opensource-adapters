@@ -1,119 +1,139 @@
-# EventSmartKafka — SAP CPI Custom Adapter
+# EventSmartKafka — SAP CPI Custom Kafka Consumer Adapter
 
-**Consumer-only Kafka adapter for SAP Cloud Integration (CPI) built on Apache Camel 3.14 / OSGi / SAP ADK 2.27.**
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-v1.1.0%20Consumer%20Final-green.svg)](#)
+[![SAP CPI](https://img.shields.io/badge/SAP%20CPI-Custom%20Adapter-0A6ED1.svg)](#)
+[![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-Consumer-black.svg)](#)
+[![SAP Cloud Connector](https://img.shields.io/badge/SAP%20Cloud%20Connector-TCP%2FSOCKS5-1f77b4.svg)](#)
+[![Avro](https://img.shields.io/badge/Avro-JSON%20%7C%20XML-green.svg)](#)
+[![Java](https://img.shields.io/badge/Java-8%20bytecode-red.svg)](#)
 
-Designed for enterprise event-driven integration. Supports on-premise Kafka brokers via SAP Cloud Connector TCP/SOCKS5 tunnel and cloud-hosted Kafka (Confluent, Aiven, Redpanda, IBM Event Streams) via direct TLS.
+**EventSmartKafka** is an open-source custom Kafka **Consumer Sender Adapter** for **SAP BTP Integration Suite / SAP Cloud Integration**.
 
----
+It was designed to consume Kafka events directly inside CPI, including **On-Premise Kafka through SAP Cloud Connector TCP/SOCKS5**, without exposing the broker publicly, without VPN, and without external bridge middleware.
 
-## Features
-
-- **3 security profiles** — NONE/PLAINTEXT, SASL (PLAIN · SCRAM-SHA-256 · SCRAM-SHA-512), SASL+TLS
-- **SAP Cloud Connector** — native TCP/SOCKS5 tunnel with SAP JWT auth (method 0x80) and RFC1929 fallback
-- **Avro conversion** — zero-dependency decoder; Magic Byte (Confluent wire format) and Fixed Schema ID modes
-- **Schema Registry cache** — 1-hour TTL, up to 512 schemas, auto-evict on expiry
-- **Offset control** — Earliest · Latest · None · Seek by Timestamp · Message Recovery
-- **Error handling** — Skip · Stop on Error · Retry (5 or 10 attempts)
-- **Poison Pill** — configurable skip with silent commit
-- **Payload limits** — 1 MB or 2 MB MAX for Avro conversion; schema size 5–15 KB MAX
-- **Consumer-only** — Producer not included in this release
-
----
-
-## Security Matrix
-
-| Authentication | TLS | Kafka Protocol | Mechanism |
-|---|---|---|---|
-| NONE | off | PLAINTEXT | — |
-| SASL | off | SASL_PLAINTEXT | PLAIN · SCRAM-256 · SCRAM-512 |
-| SASL | on | SASL_SSL | PLAIN · SCRAM-256 · SCRAM-512 |
+> **Status:** v1.1.0 — Consumer Final Release. No further updates planned for the Consumer side. Next: Producer/Receiver adapter.
+> **License:** Apache License 2.0
+> **Warranty:** Provided **AS IS**, without SLA, production warranty, SAP certification, or enterprise certification claim.
+> **Support:** This is an independent open-source project. No support, enhancements, bug fixes or SLAs are provided. Use it, fork it, learn from it.
 
 ---
 
-## Build
+## Stress Validation — 3,000,000 Messages
 
-Requires Java 8+, Maven 3.6+. All dependencies resolve from Maven Central — no local JARs needed.
+Validated on SAP BTP Trial — Sunday morning pressure stress test.
+4 listeners simultaneously. Cloud Connector tunnels. On-Premise via SOCKS5 + OSGi Relay.
 
-```bash
-mvn clean install
+| Metric | Result |
+|---|---|
+| Total messages | 3,000,000 |
+| Total failed | 0 |
+| Avg throughput | 1,825 msg/s |
+| Avg bandwidth | 1.88 MiB/s |
+| Total data | 3.023 GiB |
+| Elapsed | 00:27:23 |
+| CPI Completed | 3,000,023 |
+| CPI Failed | 0 |
+| CPI Retry | 0 |
+
+Validated across 23 topics · 4 listeners · PLAINTEXT / SASL / SASL_SSL / mTLS · Avro payloads 53 B · 1 MB · 2 MB · Apache Kafka 4.1.2 KRaft mode.
+
+---
+
+## What This Repository Contains
+
+| Path | Purpose |
+|---|---|
+| `documentations` | Documentation, screenshots, validation guides and operational notes. |
+| `eventSmartkafka (.esa) releases/` | Ready-to-import SAP CPI custom adapter archive. |
+| `pkg-adapter-custom/` | Package containing custom adapter delivery assets. |
+| `pkg-iflows-sales-otc/` | Demo package with 29 preconfigured Sales OTC iFlows used in stress tests. |
+| `src/main/` | Java source code and SAP ADK adapter implementation. |
+| `scripts/` | Validation, smoke and stress test scripts. |
+
+---
+
+## Core Capabilities
+
+- Kafka Consumer Sender Adapter for SAP Cloud Integration.
+- Apache Kafka Java Client based consumption.
+- On-Premise Kafka via SAP Cloud Connector TCP/SOCKS5 + OSGi Relay.
+- Cloud Kafka broker support.
+- Security profiles: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL, mTLS. Broker CA exposed only for SASL_SSL.
+- SASL mechanisms: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512.
+- TLS trust sources: JVM default truststore and CPI keystore certificate alias for private broker CA.
+- Avro conversion: Magic Byte, Fixed Schema ID, Avro to JSON, Avro to XML.
+- Offset control: EARLIEST, LATEST, NONE.
+- Error handling: Stop on Error, Skip Failed Message, Retry Failed Message.
+- TIMESEEK recovery by timestamp — single record or read-all-from-timestamp.
+- Parallel consumers support — N consumer instances sharing same group.id.
+- New group detection warning when auto.offset.reset=LATEST and no committed offsets.
+- Fail-fast on all configuration errors — no infinite loops, no zombie adapters.
+- CPI diagnostic headers using `x-sdiakafka-*`.
+
+---
+
+## Architecture Summary
+
+```
+SAP CPI Worker
+  -> EventSmartKafka Sender Adapter
+       -> Apache Kafka Consumer
+            -> Local TCP Relay: 127.0.0.1:<port>
+                 -> SAP Connectivity SOCKS5 Proxy
+                      -> SAP Cloud Connector
+                           -> On-Premise Kafka Broker
 ```
 
-The SAP ADK build plugin generates the `.aar` adapter archive in `target/` and copies the bundle JAR to `component/`.
+---
 
-### Key dependency versions
+## Quick Start
 
-| Artifact | Version |
-|---|---|
-| `com.sap.cloud.adk:generic.api` | 2.27.0 |
-| `com.sap.cloud.adk:adapter.api` | 2.27.0 |
-| `org.apache.camel:camel-core` | 3.14.7 |
-| `org.apache.kafka:kafka-clients` | 3.6.2 |
+1. Import the `.esa` adapter into SAP Integration Suite.
+2. Import the demo iFlow package.
+3. Configure Security Material aliases.
+4. Configure Kafka bootstrap, topic and group ID.
+5. Configure security profile and TLS trust source.
+6. For On-Premise mode, configure SAP Cloud Connector TCP mappings.
+7. Deploy the iFlows.
+8. **Redeploy all iFlows after installing a new adapter ESA version.**
+9. Produce Kafka messages and validate CPI monitoring.
 
 ---
 
-## Adapter Configuration
+## Important — Group ID and Auto Offset Reset
 
-### Connection Tab
-
-| Field | Description |
-|---|---|
-| Kafka Cluster Bootstrap Hosts | Table of `host:port` rows. Port is String — supports CPI external parameters. |
-| Proxy Type | `Internet` for cloud Kafka · `On-Premise` for SAP Cloud Connector routing |
-| Location ID | CC Location ID — leave empty when CC has no Location ID |
-| Authentication | `None` · `SASL` |
-| Connect with TLS | Enables SASL_SSL when Authentication = SASL |
-| SASL Mechanism | `PLAIN` · `SCRAM-SHA-256` · `SCRAM-SHA-512` |
-| Credential Alias | CPI Security Material alias (User Credentials) — required for SASL |
-| Broker CA Source | `JVM Trust Store` (default) · `Custom` (alias with CA cert) |
-
-### Processing Tab
-
-| Field | Description |
-|---|---|
-| Topic | Exact topic name, comma-separated list, or wildcard pattern |
-| Group ID | Consumer group ID. Leave empty for auto-generated stable ID. |
-| Auto Offset Reset | `earliest` · `latest` · `none` |
-| Error Handling | `Skip` · `Stop on Error` · `Retry Failed Message` |
-| Retry Attempts | `5` (default) · `10` (maximum) |
-| Max Payload Conversion Size | `1 MB` · `2 MB MAX` |
-| Schema ID Buffer Size | `5 KB` · `10 KB` · `15 KB MAX` |
+When using a new Group ID, if `auto.offset.reset=LATEST`, messages already in the topic will not be read.
+The adapter will log a clear warning: `⚠️ NEW GROUP DETECTED`.
+Change to `EARLIEST` if you want to read existing messages, then redeploy.
 
 ---
 
-## SAP Cloud Connector Setup
+## Parallel Consumers
 
-1. In SAP CC → Cloud To On-Premise → Access Control, add a TCP mapping:
+Set `Parallel Consumers > 1` to create multiple consumer instances sharing the same `group.id`.
+Kafka distributes partitions among them automatically via group rebalance.
 
-   | Field | Value |
-   |---|---|
-   | Protocol | TCP |
-   | Internal Host | `localhost` (or broker hostname) |
-   | Internal Port | broker port (e.g. `19091`) |
-   | Virtual Host | `sdia-kafka` |
-   | Virtual Port | `19091` |
-
-2. In the adapter, set:
-   - Proxy Type = `On-Premise`
-   - Bootstrap Host = `sdia-kafka`, Port = `19091`
-
-The adapter starts a local TCP relay (`127.0.0.1:port`) that tunnels Kafka traffic through the SAP Connectivity SOCKS5 proxy to the CC virtual host. Kafka `advertised.listeners` for the external listener **must** advertise `localhost:<port>` so that broker metadata reconnects route back through the relay.
+Rules:
+- `Parallel Consumers` cannot be combined with explicit `Partition` configuration — adapter will fail fast.
+- Effective parallelism is bounded by the number of topic partitions.
+- `Parallel Consumers > number of partitions` → idle consumers, warning logged.
 
 ---
 
-## Avro Conversion
+## Apache 2.0 License
 
-Two modes:
-
-**Magic Byte** — payload starts with `0x00` + 4-byte schema ID (Confluent wire format). Schema ID is extracted automatically from bytes 1–4.
-
-**Fixed Schema ID** — raw Avro binary without a Confluent header. Schema ID is configured statically on the channel.
-
-Schema JSON is fetched from the Schema Registry on first use and cached for 1 hour. Cache holds up to 512 entries.
+This project is released under the **Apache License 2.0**. See `LICENSE`.
 
 ---
 
-## License
+## Author
 
-Dual-licensed: Apache License 2.0 / MIT License — your choice.
+**Ricardo Luz Holanda Viana**
+Independent Integration Architecture Researcher
+SAP BTP Integration Suite Expert Developer
+SAP Press Author — Enterprise Messaging, SAP Press 2021
+Creator of DEIP · SDIA · EDCP · ODCP · GDCR
+ORCID: `0009-0009-9549-5862`
 
-Copyright © 2026 Ricardo Luz Holanda Viana — ORCID: 0009-0009-9549-5862
+GitHub: https://github.com/rhviana/sap-ci-opensource-adapters/tree/main/custom-kafka
