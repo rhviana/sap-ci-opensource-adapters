@@ -1,5 +1,6 @@
 # Contributing
 
+
 © 2026 Ricardo Luz Holanda Viana — Integration Architect Independent Solo Researcher. Creator of DEIP - SDIA - GDCR - DDCR - ODCP - EDCP - DDCP.
 
 
