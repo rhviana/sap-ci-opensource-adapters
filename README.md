@@ -74,7 +74,7 @@ The objective is to help the SAP integration community review, reproduce, challe
 
 | Path                                                                | Purpose                                                                       |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `documentations/`                                                   | Optional documentation, screenshots, validation guides and operational notes. |
+| `docs/`                                                   | Optional documentation, screenshots, validation guides and operational notes. |
 | `eventSmartkafka (.esa) releases/EventSmartKafka-Adapter-1.0.0.esa` | Ready-to-import SAP CPI custom adapter archive.                               |
 | `pkg-adapter-custom/`                                               | Package containing custom adapter delivery assets.                            |
 | `pkg-iflows-sales-otc/`                                             | Ready-to-use demo package with preconfigured Sales OTC iFlows.                |
