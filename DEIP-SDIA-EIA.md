@@ -1,4 +1,3 @@
-<img width="1340" height="897" alt="image" src="https://github.com/user-attachments/assets/e7d09569-4880-44c0-99c8-0e932a0abda9" /># DEIP / SDIA Ecosystem Connection
 
 [![License: Apache 2.0](https://img.shields.io/badge/Code%20License-Apache%202.0-blue.svg)](LICENSE)
 [![Architecture License: CC BY 4.0](https://img.shields.io/badge/Architecture%20Publications-CC%20BY%204.0-green.svg)](https://github.com/rhviana/deip)
@@ -8,7 +7,6 @@
 [![EDCP](https://img.shields.io/badge/EDCP-Event%20Domain--Centric%20Pattern-6A1B9A.svg)](https://github.com/rhviana/deip)
 [![EventSmartKafka](https://img.shields.io/badge/EventSmartKafka-SAP%20CPI%20Kafka%20Adapter-orange.svg)](#)
 
-<img width="1767" height="870" alt="image" src="https://github.com/user-attachments/assets/c541b1ba-9134-4b1f-9bc7-6c821660aba1" />
 
 
 ---
@@ -378,8 +376,7 @@ The objective is to prove that event-driven integration can be:
 - open-source;
 - technically reviewable.
 
-<img width="1340" height="897" alt="image" src="https://github.com/user-attachments/assets/58f2f9d2-8c43-49ab-9366-ccc29fe9663e" />
-
+<img width="1567" height="881" alt="image" src="https://github.com/user-attachments/assets/0c829b83-ce1e-414a-a4fe-bd13319fd114" />
 
 ---
 
@@ -442,11 +439,15 @@ This repository does not replace the DEIP repository.
 
 It operationalizes part of the model through a concrete SAP CPI Kafka adapter.
 
-<img width="1567" height="881" alt="image" src="https://github.com/user-attachments/assets/0c829b83-ce1e-414a-a4fe-bd13319fd114" />
-
 
 ---
 
+## www.domain-intent.com
+
+The the website with resume of especification and name convention generators, under adjustments.
+
+
+---
 ## Author
 
 **Ricardo Luz Holanda Viana**  
