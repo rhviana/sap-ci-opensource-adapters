@@ -7,7 +7,7 @@
 [![EDCP](https://img.shields.io/badge/EDCP-Event%20Domain--Centric%20Pattern-6A1B9A.svg)](https://github.com/rhviana/deip)
 [![EventSmartKafka](https://img.shields.io/badge/EventSmartKafka-SAP%20CPI%20Kafka%20Adapter-orange.svg)](#)
 
-
+<img width="911" height="502" alt="image" src="https://github.com/user-attachments/assets/8c7a1db7-29ac-4069-bc3d-522cdcaf95d0" />
 
 ---
 
