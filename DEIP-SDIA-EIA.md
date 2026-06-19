@@ -1,4 +1,4 @@
-# DEIP / SDIA Ecosystem Connection
+<img width="1340" height="897" alt="image" src="https://github.com/user-attachments/assets/e7d09569-4880-44c0-99c8-0e932a0abda9" /># DEIP / SDIA Ecosystem Connection
 
 [![License: Apache 2.0](https://img.shields.io/badge/Code%20License-Apache%202.0-blue.svg)](LICENSE)
 [![Architecture License: CC BY 4.0](https://img.shields.io/badge/Architecture%20Publications-CC%20BY%204.0-green.svg)](https://github.com/rhviana/deip)
@@ -7,6 +7,9 @@
 [![ODCP](https://img.shields.io/badge/ODCP-Orchestration%20Domain--Centric%20Pattern-1B5E20.svg)](https://github.com/rhviana/deip)
 [![EDCP](https://img.shields.io/badge/EDCP-Event%20Domain--Centric%20Pattern-6A1B9A.svg)](https://github.com/rhviana/deip)
 [![EventSmartKafka](https://img.shields.io/badge/EventSmartKafka-SAP%20CPI%20Kafka%20Adapter-orange.svg)](#)
+
+<img width="1767" height="870" alt="image" src="https://github.com/user-attachments/assets/c541b1ba-9134-4b1f-9bc7-6c821660aba1" />
+
 
 ---
 
@@ -89,6 +92,9 @@ Ecosystem DOI: 10.5281/zenodo.19004802
 Repository: https://github.com/rhviana/deip
 ```
 
+<img width="832" height="507" alt="image" src="https://github.com/user-attachments/assets/77ff34e0-05cb-40c7-8c0b-186766324183" />
+
+
 ---
 
 ## What SDIA Provides
@@ -148,6 +154,8 @@ The SDIA ecosystem is organized into semantic layers.
 | Layer 3 | ODCP | Domain-centric orchestration topology for packages, iFlows, credentials and channels. |
 | Layer 4 | EDCP | Domain-centric event topology for topics, queues, event meshes and consumer groups. |
 | Layer 5 | DDCP | Domain-centric persistent data topology. |
+
+<img width="1297" height="837" alt="image" src="https://github.com/user-attachments/assets/a0a2696a-42a1-4cec-8ed7-56f53ca811ca" />
 
 ---
 
@@ -370,6 +378,9 @@ The objective is to prove that event-driven integration can be:
 - open-source;
 - technically reviewable.
 
+<img width="1340" height="897" alt="image" src="https://github.com/user-attachments/assets/58f2f9d2-8c43-49ab-9366-ccc29fe9663e" />
+
+
 ---
 
 ## Relationship Between Repositories
@@ -396,6 +407,7 @@ https://github.com/rhviana/deip
 Core publications:
 
 ```text
+
 DEIP — Domain Enterprise Integration Pattern
 https://doi.org/10.5281/zenodo.19004802
 
@@ -429,6 +441,9 @@ EventSmartKafka remains an executable open-source adapter project and community 
 This repository does not replace the DEIP repository.
 
 It operationalizes part of the model through a concrete SAP CPI Kafka adapter.
+
+<img width="1567" height="881" alt="image" src="https://github.com/user-attachments/assets/0c829b83-ce1e-414a-a4fe-bd13319fd114" />
+
 
 ---
 
