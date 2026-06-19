@@ -1,0 +1,36 @@
+# Demo Users
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../../LICENSE)
+[![Demo Only](https://img.shields.io/badge/Demo%20Only-Do%20Not%20Reuse-orange.svg)](#)
+
+This folder documents the local Kafka demo users used by the EventSmartKafka validation setup.
+
+## Canonical Demo User
+
+```text
+username: sdia
+password: SDIABRASIL
+```
+
+This is the only canonical user kept in the public local Kafka demo.
+
+Do not reuse this password in any real environment.
+
+## Authentication Coverage
+
+The same demo user is used for:
+
+| Listener | Port | Security |
+|---|---:|---|
+| `SASLEXT` | `19102` | SASL_PLAINTEXT |
+| `SASLSSLEXT` | `19103` | SASL_SSL |
+
+Supported mechanisms in the local demo:
+
+```text
+PLAIN
+SCRAM-SHA-256
+SCRAM-SHA-512
+```
+
+The reset/start script creates the SCRAM credentials for the user `sdia` automatically.

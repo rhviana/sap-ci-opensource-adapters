@@ -1,0 +1,27 @@
+# Demo Certificates
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../../LICENSE)
+[![TLS](https://img.shields.io/badge/TLS-Local%20Demo-green.svg)](#)
+[![Demo Only](https://img.shields.io/badge/Demo%20Only-Not%20Production-orange.svg)](#)
+
+This folder contains local demo TLS material used by the Kafka `SASL_SSL` listener.
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `ca.crt` | Demo CA certificate used by Python producers and client properties. |
+| `kafka.server.keystore.p12` | Demo Kafka server keystore. |
+| `kafka.server.truststore.p12` | Demo Kafka server truststore. |
+
+## Password
+
+The local demo keystore/truststore password is:
+
+```text
+changeit
+```
+
+This is local test material only.
+
+Do not use these certificates or passwords in any real environment.
