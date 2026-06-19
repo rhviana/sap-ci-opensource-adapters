@@ -1,5 +1,4 @@
 # Code of Conduct
-
 ## Our Pledge
 
 We as members, contributors, and maintainers pledge to make participation in this
