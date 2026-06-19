@@ -51,6 +51,9 @@ It enables Kafka event consumption directly inside SAP CPI, including scenarios 
 
 The adapter is delivered as a ready-to-import `.esa` archive, together with source code, documentation, demo iFlow packages, validation scripts, and operational troubleshooting material.
 
+<img width="917" height="511" alt="image" src="https://github.com/user-attachments/assets/c1c3d0cb-ddab-41ad-8cd8-35e84c1a1186" />
+
+
 ---
 
 ## Repository Purpose
