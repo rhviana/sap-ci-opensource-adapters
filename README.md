@@ -79,14 +79,19 @@ The objective is to help the SAP integration community review, reproduce, challe
 
 ## Repository Structure
 
-| Path                                                                | Purpose                                                                       |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `docs/`                                                   | Optional documentation, screenshots, validation guides and operational notes. |
-| `eventSmartkafka (.esa) releases/EventSmartKafka-Adapter-1.0.0.esa` | Ready-to-import SAP CPI custom adapter archive.                               |
-| `pkg-adapter-custom/`                                               | Package containing custom adapter delivery assets.                            |
-| `pkg-iflows-sales-otc/`                                             | Ready-to-use demo package with preconfigured Sales OTC iFlows.                |
-| `src/main/`                                                         | Java source code and SAP ADK adapter implementation.                          |
-| `scripts/`                                                          | Optional validation, smoke-test, stress-test and payload-generation scripts.  |
+| Path | Purpose |
+| ---- | ------- |
+| `custom-kafka/` | EventSmartKafka adapter — full project root. |
+| `custom-kafka/kafka-local-demo/` | Local Kafka environment: Docker Compose, certs, SASL/TLS properties, Avro schemas, payload binaries, smoke and stress test scripts. |
+| `custom-kafka/src/` | Java source code and SAP ADK adapter implementation. |
+| `custom-kafka/pom.xml` | Maven build descriptor for the adapter project. |
+| `custom-kafka/config.adk` | SAP ADK adapter configuration descriptor. |
+| `custom-https/` | Custom HTTPS adapter project (additional adapter). |
+| `.gitignore` | Repository-level ignore rules. |
+| `CODE_OF_CONDUCT.md` | Community code of conduct. |
+| `CONTRIBUTING.md` | Contribution guidelines. |
+| `DEIP-SDIA-EIA.md` | Design and architecture reference document. |
+| `LICENSE` | Apache License 2.0. |
 
 ---
 
