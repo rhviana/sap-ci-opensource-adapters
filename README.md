@@ -6,6 +6,10 @@
 [![Open Source](https://img.shields.io/badge/Open%20Source-Community%20Driven-green.svg)](#)
 [![Status](https://img.shields.io/badge/Status-Technical%20Preview-orange.svg)](#)
 
+
+<img width="1310" height="887" alt="image" src="https://github.com/user-attachments/assets/3a737d09-01ec-4bb9-ba1a-d8696409f22a" />
+
+
 ## Overview
 
 **SAP CI Open-Source Adapters** is an open-source repository dedicated to custom adapter development, extension functionality, reusable integration components, and technical research for **SAP BTP Integration Suite / SAP Cloud Integration**.
