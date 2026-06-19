@@ -1,0 +1,41 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "com.acme.sales.otc",
+  "doc": "Order-to-Cash order event. Used by EventSmartKafka conversion tests.",
+  "fields": [
+    { "name": "eventId",        "type": "string", "doc": "Unique event UUID" },
+    { "name": "eventType",      "type": "string", "doc": "e.g. ORDER_CREATED" },
+    { "name": "eventTimestamp", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "orderId",        "type": "string" },
+    { "name": "customerId",     "type": "string" },
+    { "name": "currency",       "type": "string", "default": "EUR" },
+    { "name": "totalAmount",    "type": "double" },
+    { "name": "status",         "type": "string", "default": "CREATED" },
+    {
+      "name": "lineItems",
+      "doc": "Array sized at generation time to hit a target payload size.",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "LineItem",
+          "fields": [
+            { "name": "sku",         "type": "string" },
+            { "name": "description", "type": "string" },
+            { "name": "quantity",    "type": "int" },
+            { "name": "unitPrice",   "type": "double" },
+            { "name": "lineTotal",   "type": "double" },
+            { "name": "warehouse",   "type": "string" },
+            { "name": "notes",       "type": ["null", "string"], "default": null }
+          ]
+        }
+      }
+    },
+    {
+      "name": "metadata",
+      "type": { "type": "map", "values": "string" },
+      "doc": "Free-form key/value metadata"
+    }
+  ]
+}

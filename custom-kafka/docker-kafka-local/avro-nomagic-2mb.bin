@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Regenerate the small OrderSimple payload WITH magic byte at a chosen schema id."""
+import io, struct, json, os, fastavro
+
+SCHEMA_ID = 100012   # <-- change to the id Confluent assigns to order-simple.avsc
+schema = fastavro.parse_schema(json.load(open(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'payloads', 'avro', 'order-simple.avsc')))))
+
+record = {
+    "orderId": "order-2026-0001",
+    "customerId": "CUST-A47291",
+    "totalAmount": 1250.75,
+    "currency": "BRL",
+    "status": "CREATED",
+}
+buf = io.BytesIO()
+fastavro.schemaless_writer(buf, schema, record)
+body = buf.getvalue()
+out = struct.pack(">Bi", 0x00, SCHEMA_ID) + body
+with open(os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'payloads', 'avro')), 'payload-magic-ordersimple-53b.bin'), 'wb') as f:
+    f.write(out)
+print(f"payload-magic-ordersimple-53b.bin : {len(out)} bytes  schemaId={SCHEMA_ID}")
+print("  header:", ' '.join(f'{b:02x}' for b in out[:5]))
