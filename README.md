@@ -4,8 +4,7 @@
 [![SAP Integration Suite](https://img.shields.io/badge/SAP%20Integration%20Suite-Custom%20Adapters-0A6ED1.svg)](#)
 [![SAP Cloud Integration](https://img.shields.io/badge/SAP%20Cloud%20Integration-CPI-0A6ED1.svg)](#)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Community%20Driven-green.svg)](#)
-[![Status](https://img.shields.io/badge/Status-Technical%20Preview-orange.svg)](#)
-
+[![Status](https://img.shields.io/badge/Status-v1.1.0%20Consumer%20Final-green.svg)](#)
 
 ## Overview
 
@@ -13,133 +12,128 @@
 
 The goal of this repository is to explore how SAP Cloud Integration can be extended beyond standard adapter capabilities through community-driven engineering, custom SAP ADK adapters, reusable packages, runtime diagnostics, validation assets, and domain-oriented integration patterns.
 
-This repository is not an official SAP product.
+This repository is not an official SAP product. It is an independent open-source technical initiative intended for:
 
-It is an independent open-source technical initiative intended for:
-
-* SAP Cloud Integration custom adapter development
-* Extension functionality around SAP standard adapter limitations
-* Event-driven architecture experiments
-* Runtime diagnostics and troubleshooting patterns
-* SAP ADK / Camel-based adapter research
-* Open-source reusable integration packages
-* Community validation and technical review
+- SAP Cloud Integration custom adapter development
+- Extension functionality around SAP standard adapter limitations
+- Event-driven architecture experiments
+- Runtime diagnostics and troubleshooting patterns
+- SAP ADK / Camel-based adapter research
+- Open-source reusable integration packages
+- Community validation and technical review
 
 All components are provided under the **Apache License 2.0**, in **AS IS** condition, without warranty, SLA, SAP certification, or production-grade claim.
 
+> **No support is provided.** This is an independent open-source project. No bug fixes, enhancements, or SLAs. Use it, fork it, learn from it.
+
 ---
 
-## Current Adapter Project
-
-The first public project in this repository is:
-
-## EventSmartKafka
+## EventSmartKafka — Consumer Final v1.1.0
 
 **EventSmartKafka** is a custom Kafka **Consumer Sender Adapter** for SAP Cloud Integration.
 
-It enables Kafka event consumption directly inside SAP CPI, including scenarios where Kafka is available through:
+It enables Kafka event consumption directly inside SAP CPI, including On-Premise Kafka through SAP Cloud Connector TCP/SOCKS5, without exposing the broker publicly, without VPN, and without external bridge middleware.
 
-* Cloud Kafka brokers
-* On-Premise Kafka
-* SAP Cloud Connector TCP/SOCKS5
-* SASL / TLS / SCRAM security profiles
-* Avro conversion through Schema Registry
-* Offset control and recovery behavior
+### Stress Validation — 4.5 Million Messages Total
 
-The adapter is delivered as a ready-to-import `.esa` archive, together with source code, documentation, demo iFlow packages, validation scripts, and operational troubleshooting material.
+| Cycle | Messages | Failed | Result |
+|---|---|---|---|
+| RC1 validation | 1,500,000 | 0 | ✅ PASS |
+| v1.1.0 stress test | 3,000,000 | 0 | ✅ PASS |
+| **Total** | **4,500,000** | **0** | **✅ PASS** |
+
+v1.1.0 stress test details — SAP BTP Trial, Sunday morning pressure test:
+
+| Metric | Result |
+|---|---|
+| Total messages | 3,000,000 |
+| Total failed | 0 |
+| Avg throughput | 1,825 msg/s |
+| Avg bandwidth | 1.88 MiB/s |
+| Total data | 3.023 GiB |
+| Elapsed | 00:27:23 |
+| CPI Completed | 3,000,023 |
+| CPI Failed | 0 |
+| CPI Retry | 0 |
+
+23 topics · 4 listeners · PLAINTEXT / SASL / SASL_SSL / mTLS · Avro 53 B · 1 MB · 2 MB · Apache Kafka 4.1.2 KRaft mode · 29 iFlows.
+
+### Capabilities
+
+- Kafka Consumer Sender Adapter for SAP Cloud Integration
+- On-Premise Kafka via SAP Cloud Connector TCP/SOCKS5 + OSGi Relay
+- Cloud Kafka broker support
+- Security: PLAINTEXT, SASL_PLAINTEXT, SASL_SSL, mTLS
+- SASL mechanisms: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+- TLS: JVM trust store or custom CA alias (SASL_SSL only)
+- Avro to JSON / Avro to XML conversion
+- Confluent Magic Byte / Wire Format + Fixed Schema ID
+- Schema Registry cache and timeout handling
+- Offset control: EARLIEST, LATEST, NONE
+- TIMESEEK recovery — single record or read-all-from-timestamp
+- Parallel consumers — N instances, Kafka distributes partitions automatically
+- Fail-fast on all error scenarios — no infinite loops, no zombie adapters
+- New consumer group detection with LATEST warning
+- Structured error messages with topic, partition, offset, UTC timestamp, Unix epoch and TIMESEEK hint
+
+### Status
+
+**v1.1.0 — Consumer Final Release.**
+No further updates planned for the Consumer/Sender side.
+**Next: Producer/Receiver adapter.**
 
 <img width="917" height="511" alt="image" src="https://github.com/user-attachments/assets/c1c3d0cb-ddab-41ad-8cd8-35e84c1a1186" />
-
-
----
-
-## Repository Purpose
-
-This repository exists to provide more than isolated source code.
-
-The intended delivery model is a complete technical package:
-
-* Custom adapter source code
-* Ready-to-import ESA release artifact
-* SAP CPI package assets
-* Demo iFlows
-* Documentation
-* Validation scripts
-* Troubleshooting guides
-* Performance notes
-* SAP Community study-case material
-* Reproducible technical baselines
-
-The objective is to help the SAP integration community review, reproduce, challenge, improve, and extend custom adapter capabilities in a transparent way.
 
 ---
 
 ## Repository Structure
 
 | Path | Purpose |
-| ---- | ------- |
+|---|---|
 | `custom-kafka/` | EventSmartKafka adapter — full project root. |
-| `custom-kafka/kafka-local-demo/` | Local Kafka environment: Docker Compose, certs, SASL/TLS properties, Avro schemas, payload binaries, smoke and stress test scripts. |
 | `custom-kafka/src/` | Java source code and SAP ADK adapter implementation. |
-| `custom-kafka/pom.xml` | Maven build descriptor for the adapter project. |
+| `custom-kafka/kafka-local-demo/` | Local Kafka environment: Docker Compose, certs, SASL/TLS properties, Avro schemas, smoke and stress test scripts. |
+| `custom-kafka/eventSmartKafka (.esa) releases/` | Ready-to-import SAP CPI custom adapter archive. |
+| `custom-kafka/pkg-iflows-sales-otc/` | Demo package with 29 preconfigured Sales OTC iFlows. |
+| `custom-kafka/pom.xml` | Maven build descriptor. |
 | `custom-kafka/config.adk` | SAP ADK adapter configuration descriptor. |
-| `custom-https/` | Custom HTTPS adapter project (additional adapter). |
-| `.gitignore` | Repository-level ignore rules. |
+| `custom-https/` | Custom HTTPS adapter project — next release. |
+| `DEIP-SDIA-EIA.md` | Design and architecture reference document. |
 | `CODE_OF_CONDUCT.md` | Community code of conduct. |
 | `CONTRIBUTING.md` | Contribution guidelines. |
-| `DEIP-SDIA-EIA.md` | Design and architecture reference document. |
 | `LICENSE` | Apache License 2.0. |
 
 ---
 
 ## What This Repository Is
 
-This repository is:
-
-* An open-source SAP Cloud Integration engineering initiative
-* A public technical preview workspace
-* A custom adapter research and delivery repository
-* A place for SAP CPI extension experiments
-* A reusable baseline for SAP Community technical review
-* A practical study case for event-driven integration in SAP BTP
-
----
+- An open-source SAP Cloud Integration engineering initiative
+- A public technical preview workspace
+- A custom adapter research and delivery repository
+- A practical study case for event-driven integration in SAP BTP
+- A reusable baseline for SAP Community technical review
 
 ## What This Repository Is Not
 
-This repository is not:
+- An official SAP product
+- An SAP-certified adapter catalog
+- A commercial support channel
+- A production SLA offering
+- An enterprise certification package
 
-* An official SAP product
-* An SAP-certified adapter catalog
-* A commercial support channel
-* A production SLA offering
-* An enterprise certification package
-* A replacement for customer-side validation
-* A guarantee of compatibility with every CPI runtime or broker environment
-
-Every adopter must validate the adapter and package behavior in their own SAP Integration Suite tenant, broker landscape, security configuration, and operational model.
+Every adopter must validate adapter behavior in their own SAP Integration Suite tenant, broker landscape, security configuration, and operational model.
 
 ---
 
 ## License
 
-All source code and repository assets are released under the **Apache License 2.0**, unless explicitly stated otherwise in a specific folder.
-
-See:
-
-```text
-LICENSE
-```
+All source code and repository assets are released under the **Apache License 2.0**.
 
 ---
 
 ## Disclaimer
 
-This project is provided **AS IS**.
-
-There is no warranty, no SLA, no official SAP support, no SAP certification, and no production-readiness guarantee.
-
-The project is intended for technical study, community review, controlled validation, and open-source collaboration.
+This project is provided **AS IS**. No warranty, no SLA, no official SAP support, no SAP certification, no production-readiness guarantee. Independent open-source project for technical study, community review, and controlled validation.
 
 ---
 
@@ -156,20 +150,6 @@ ORCID: `0009-0009-9549-5862`
 
 ## Community Review
 
-Technical feedback, issue reports, pull requests, validation results, and architecture discussions are welcome.
+Technical feedback, issue reports, pull requests and validation results are welcome.
 
-When reporting issues, include:
-
-* Adapter version
-* ESA version
-* SAP CPI runtime context
-* Broker type
-* Security profile
-* Proxy type
-* Topic
-* Group ID
-* Payload size
-* Error message
-* Steps to reproduce
-
-This helps keep discussions technical, reproducible, and useful for the community.
+When reporting issues, include: adapter version · ESA version · SAP CPI runtime · broker type · security profile · proxy type · topic · group ID · payload size · error message · steps to reproduce.
