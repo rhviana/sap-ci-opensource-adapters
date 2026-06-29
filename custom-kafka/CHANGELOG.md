@@ -1,5 +1,6 @@
 ## v3.0.0 — Ricardoviana Runtime Guard
 
+
 - Aligned ADK metadata/config/POM version to 3.0.0 and vendor to ricardoviana.opensource.
 - Kept Consumer-only runtime and existing consumer diagnostic messages.
 - Hardened Cloud Connector relay thread scheduling and socket limits.

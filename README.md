@@ -6,6 +6,7 @@
 [![Open Source](https://img.shields.io/badge/Open%20Source-Community%20Driven-green.svg)](#)
 [![Status](https://img.shields.io/badge/Status-Technical%20Preview-orange.svg)](#)
 
+
 ## Overview
 
 **SAP CI Open-Source Adapters** is an open-source repository dedicated to custom adapter development, extension functionality, reusable integration components, and technical research for **SAP BTP Integration Suite / SAP Cloud Integration**.
@@ -47,6 +48,9 @@ It enables Kafka event consumption directly inside SAP CPI, including scenarios 
 
 The adapter is delivered as a ready-to-import `.esa` archive, together with source code, documentation, demo iFlow packages, validation scripts, and operational troubleshooting material.
 
+<img width="917" height="511" alt="image" src="https://github.com/user-attachments/assets/c1c3d0cb-ddab-41ad-8cd8-35e84c1a1186" />
+
+
 ---
 
 ## Repository Purpose
@@ -72,14 +76,19 @@ The objective is to help the SAP integration community review, reproduce, challe
 
 ## Repository Structure
 
-| Path                                                                | Purpose                                                                       |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `docs/`                                                   | Optional documentation, screenshots, validation guides and operational notes. |
-| `eventSmartkafka (.esa) releases/EventSmartKafka-Adapter-1.0.0.esa` | Ready-to-import SAP CPI custom adapter archive.                               |
-| `pkg-adapter-custom/`                                               | Package containing custom adapter delivery assets.                            |
-| `pkg-iflows-sales-otc/`                                             | Ready-to-use demo package with preconfigured Sales OTC iFlows.                |
-| `src/main/`                                                         | Java source code and SAP ADK adapter implementation.                          |
-| `scripts/`                                                          | Optional validation, smoke-test, stress-test and payload-generation scripts.  |
+| Path | Purpose |
+| ---- | ------- |
+| `custom-kafka/` | EventSmartKafka adapter — full project root. |
+| `custom-kafka/kafka-local-demo/` | Local Kafka environment: Docker Compose, certs, SASL/TLS properties, Avro schemas, payload binaries, smoke and stress test scripts. |
+| `custom-kafka/src/` | Java source code and SAP ADK adapter implementation. |
+| `custom-kafka/pom.xml` | Maven build descriptor for the adapter project. |
+| `custom-kafka/config.adk` | SAP ADK adapter configuration descriptor. |
+| `custom-https/` | Custom HTTPS adapter project (additional adapter). |
+| `.gitignore` | Repository-level ignore rules. |
+| `CODE_OF_CONDUCT.md` | Community code of conduct. |
+| `CONTRIBUTING.md` | Contribution guidelines. |
+| `DEIP-SDIA-EIA.md` | Design and architecture reference document. |
+| `LICENSE` | Apache License 2.0. |
 
 ---
 
